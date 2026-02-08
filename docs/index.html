@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>KeyContracts Dashboard</title>
+
+  <!-- DataTables CSS -->
+  <link rel="stylesheet" href="https://cdn.datatables.net/2.0.8/css/dataTables.dataTables.min.css">
+
+  <style>
+    body{
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
+      margin:0;
+      padding:14px;
+      background:#0b111a;
+      color:#e8eef7;
+    }
+    h2{
+      margin:0 0 6px;
+      font-size:18px;
+    }
+    .sub{
+      opacity:.75;
+      font-size:12px;
+      margin-bottom:10px;
+    }
+    .wrap{
+      background:#0f1620;
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:12px;
+      padding:12px;
+    }
+    table.dataTable{
+      width:100% !important;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <h2>KeyContracts (Latest)</h2>
+    <div class="sub">Search / sort / filter · Data source: latest.csv</div>
+    <table id="t" class="display"></table>
+  </div>
+
+  <!-- jQuery -->
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <!-- DataTables JS -->
+  <script src="https://cdn.datatables.net/2.0.8/js/dataTables.min.js"></script>
+  <!-- PapaParse (robust CSV parser) -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+  <script>
+    async function loadCSV(url){
+      const res = await fetch(url + '?v=' + Date.now()); // avoid cache
+      const csvText = await res.text();
+
+      const parsed = Papa.parse(csvText, {
+        header: true,
+        skipEmptyLines: true
+      });
+
+      if(parsed.errors && parsed.errors.length){
+        console.error(parsed.errors);
+        alert("CSV parse error. Check console.");
+        return;
+      }
+
+      const headers = parsed.meta.fields || [];
+      const dataRows = parsed.data || [];
+
+      const columns = headers.map(h => ({
+        title: h,
+        data: h
+      }));
+
+      // Destroy table if reload
+      if ($.fn.dataTable.isDataTable('#t')) {
+        $('#t').DataTable().destroy();
+        $('#t').empty();
+      }
+
+      new DataTable('#t', {
+        data: dataRows,
+        columns: columns,
+        pageLength: 25,
+        scrollX: true,
+        order: []
+      });
+    }
+
+    loadCSV('latest.csv');
+  </script>
+</body>
+</html>
