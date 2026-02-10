@@ -1,173 +1,321 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>OptionNote – Key Contracts</title>
-
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#0f172a" />
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>OptionNote Dashboard</title>
 
   <!-- DataTables CSS -->
-  <link
-    rel="stylesheet"
-    href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css"
-  />
-
-  <!-- jQuery -->
-  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-
-  <!-- DataTables JS -->
-  <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
-
-  <!-- PapaParse -->
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css"/>
 
   <style>
-    :root {
-      --bg: #0b1220;
-      --panel: #111827;
-      --text: #e5e7eb;
-      --muted: #9ca3af;
-      --line: #1f2937;
-      --accent: #38bdf8;
+    /* ===== White background ===== */
+    html, body { height: 100%; }
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: #ffffff;
+      color:#111;
     }
-
-    * {
-      box-sizing: border-box;
+    .wrap{
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 18px 14px 24px;
     }
-
-    body {
-      margin: 0;
-      padding: 24px;
-      background: linear-gradient(180deg, #020617, #020617 40%, #030712);
-      color: var(--text);
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
-    }
-
-    h1 {
-      margin: 0 0 6px 0;
-      font-size: 24px;
+    h1{
+      margin: 0 0 10px;
+      font-size: 20px;
       font-weight: 700;
     }
-
-    .subtitle {
-      color: var(--muted);
-      font-size: 14px;
-      margin-bottom: 20px;
-    }
-
-    .card {
-      background: linear-gradient(180deg, #020617, #020617 40%, #030712);
-      border: 1px solid var(--line);
-      border-radius: 14px;
-      padding: 18px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-    }
-
-    table.dataTable {
-      width: 100% !important;
-      border-collapse: collapse !important;
-    }
-
-    table.dataTable thead th {
-      background: #020617;
-      color: #f8fafc;
-      border-bottom: 1px solid var(--line);
+    .sub{
+      margin: 0 0 14px;
       font-size: 13px;
-      white-space: nowrap;
+      color:#444;
     }
 
-    table.dataTable tbody td {
-      border-bottom: 1px solid var(--line);
+    /* Control bar */
+    .bar{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      align-items:center;
+      margin: 10px 0 14px;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      background: #fafafa;
+    }
+    .btn{
+      border:1px solid #ccc;
+      background:#fff;
+      padding:6px 10px;
+      border-radius:8px;
+      cursor:pointer;
       font-size: 13px;
-      white-space: nowrap;
+    }
+    .btn:hover{ background:#f2f2f2; }
+    .pill{
+      font-size:12px;
+      padding:4px 8px;
+      border-radius:999px;
+      border:1px solid #ddd;
+      background:#fff;
+      color:#333;
+    }
+    .spacer{ flex:1; }
+
+    /* Table look */
+    table.dataTable{
+      background:#fff !important;
+      border:1px solid #ddd;
+      border-radius: 10px;
+      overflow:hidden;
+    }
+    table.dataTable thead th{
+      background:#f6f6f6 !important;
+      color:#111 !important;
+      border-bottom:1px solid #ddd !important;
+      font-weight:700;
     }
 
-    table.dataTable tbody tr:hover {
-      background: rgba(56, 189, 248, 0.08);
+    /* ===== Conditional styling classes ===== */
+    tr.row-bull td{
+      background: #92D050 !important; /* RGB(146,208,80) */
+      color:#111 !important;
+    }
+    tr.row-bear td{
+      background: #FFC000 !important; /* RGB(255,192,0) */
+      color:#111 !important;
+    }
+    tr.row-grey td{
+      background: #e6e6e6 !important;
+      color:#333 !important;
     }
 
-    .dataTables_wrapper {
-      color: var(--text);
+    /* keep hover readable */
+    table.dataTable.hover tbody tr:hover td{
+      filter: brightness(0.98);
     }
 
-    .dataTables_length,
-    .dataTables_filter,
-    .dataTables_info,
-    .dataTables_paginate {
-      color: var(--muted) !important;
-      font-size: 13px;
-      margin-top: 12px;
-    }
-
-    .dataTables_filter input,
-    .dataTables_length select {
-      background: #020617;
-      border: 1px solid var(--line);
-      color: var(--text);
-      border-radius: 6px;
+    /* Column filter inputs in header (if you have) */
+    .col-filter{
+      width: 100%;
+      box-sizing: border-box;
+      font-size: 12px;
       padding: 4px 6px;
-    }
-
-    .dataTables_paginate .paginate_button {
-      color: var(--muted) !important;
-    }
-
-    .dataTables_paginate .paginate_button.current {
-      color: white !important;
-      background: #020617 !important;
-      border: 1px solid var(--accent);
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      margin-top: 6px;
+      background: #fff;
     }
   </style>
 </head>
 
 <body>
-  <div class="card">
-    <h1>KeyContracts (Latest)</h1>
-    <div class="subtitle">
-      Search / sort / filter · Data source: <b>latest.csv</b>
+  <div class="wrap">
+    <h1>OptionNote</h1>
+    <p class="sub">
+      Data source: <span class="pill">docs/latest.csv</span>
+      <span id="rowInfo" class="pill">Loading…</span>
+    </p>
+
+    <div class="bar">
+      <button class="btn" id="btnNotExp">Show NotExp only</button>
+      <button class="btn" id="btnAll">Show ALL entries</button>
+
+      <div class="spacer"></div>
+
+      <button class="btn" id="btnReset">Reset (clear search / sort / filters)</button>
     </div>
 
-    <table id="t" class="display stripe hover compact">
+    <table id="tbl" class="display hover" style="width:100%">
       <thead>
-        <tr></tr>
+        <tr id="hdrRow"></tr>
       </thead>
       <tbody></tbody>
     </table>
   </div>
 
-  <script>
-    const csvUrl = "latest.csv?v=" + Date.now();
+  <!-- jQuery + DataTables + PapaParse -->
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
-    Papa.parse(csvUrl, {
+  <script>
+    // ========= Config =========
+    const CSV_URL = "latest.csv"; // because index.html is in docs/
+    const DEFAULT_PAGE_LEN = 50;
+
+    // If your CSV still has "Exp?" column, use it. If not present, buttons will still work (show all).
+    const EXP_COL_CANDIDATES = ["Exp?", "Exp.", "Exp"];
+
+    // ========= State =========
+    let dt = null;
+    let allRows = [];
+    let headers = [];
+    let expColName = null;
+
+    // ========= Helpers =========
+    function findColIndex(name){
+      const idx = headers.indexOf(name);
+      return idx >= 0 ? idx : -1;
+    }
+
+    function detectExpCol(){
+      for(const c of EXP_COL_CANDIDATES){
+        if(headers.includes(c)) return c;
+      }
+      return null;
+    }
+
+    function buildHeader(){
+      const hdr = document.getElementById("hdrRow");
+      hdr.innerHTML = "";
+      headers.forEach(h => {
+        const th = document.createElement("th");
+        th.textContent = h;
+        hdr.appendChild(th);
+      });
+    }
+
+    function buildDataTable(data){
+      // Destroy if exists
+      if(dt){
+        dt.destroy();
+        $("#tbl tbody").empty();
+      }
+
+      // Populate body
+      const tbody = document.querySelector("#tbl tbody");
+      tbody.innerHTML = "";
+      data.forEach(row => {
+        const tr = document.createElement("tr");
+        headers.forEach(h => {
+          const td = document.createElement("td");
+          td.textContent = row[h] ?? "";
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+
+      // Init DataTables
+      dt = $("#tbl").DataTable({
+        pageLength: DEFAULT_PAGE_LEN,
+        lengthMenu: [25, 50, 100, 250, 500],
+        order: [],                 // start unsorted
+        deferRender: true,
+        autoWidth: false,
+        // Row styling based on row data
+        createdRow: function(row, dataArr){
+          // Map array back to object for easier lookup
+          const obj = {};
+          headers.forEach((h, i) => obj[h] = dataArr[i]);
+
+          const flag = (obj["vecBullBearFlag"] || "").toString().trim().toUpperCase();
+
+          // FinalNetPrem numeric check (<=0 => grey)
+          const premRaw = obj["FinalNetPrem"];
+          const prem = parseFloat(String(premRaw || "").replace(/,/g, "").trim());
+          const premIsNum = !Number.isNaN(prem);
+
+          // Priority: grey overrides bull/bear (as you requested)
+          if(premIsNum && prem <= 0){
+            row.classList.add("row-grey");
+            return;
+          }
+
+          if(flag === "BULL") row.classList.add("row-bull");
+          if(flag === "BEAR") row.classList.add("row-bear");
+        },
+        initComplete: function(){
+          const api = this.api();
+
+          // Add per-column filters (inputs) on header (second row not used -> we inject inside header cells)
+          // If you already had your own filter UI, you can remove this block.
+          api.columns().every(function(){
+            const col = this;
+            const th = $(col.header());
+
+            // Avoid duplicate inputs if re-init
+            th.find("input.col-filter").remove();
+
+            const input = $('<input class="col-filter" type="text" placeholder="filter...">')
+              .appendTo(th)
+              .on("keyup change clear", function(){
+                if(col.search() !== this.value){
+                  col.search(this.value).draw();
+                }
+              });
+          });
+
+          updateRowInfo();
+        }
+      });
+
+      dt.on("draw", function(){ updateRowInfo(); });
+    }
+
+    function updateRowInfo(){
+      if(!dt) return;
+      const info = dt.page.info();
+      document.getElementById("rowInfo").textContent =
+        `Rows: ${info.recordsDisplay.toLocaleString()} / ${info.recordsTotal.toLocaleString()}`;
+    }
+
+    function resetAll(){
+      if(!dt) return;
+      dt.search("");
+      dt.columns().search("");
+      dt.order([]);     // back to original order
+      dt.page.len(DEFAULT_PAGE_LEN);
+      dt.draw();
+    }
+
+    function showAllEntries(){
+      buildDataTable(allRows);
+    }
+
+    function showNotExpOnly(){
+      if(!expColName){
+        // If Exp column not in CSV, just show all
+        buildDataTable(allRows);
+        return;
+      }
+      const filtered = allRows.filter(r => String(r[expColName] || "").trim().toLowerCase() === "notexp");
+      buildDataTable(filtered);
+    }
+
+    // ========= Load CSV =========
+    Papa.parse(CSV_URL, {
       download: true,
       header: true,
+      dynamicTyping: false,
       skipEmptyLines: true,
-      complete: function (results) {
-        if (!results.data || results.data.length === 0) {
-          alert("CSV loaded but contains no rows.");
-          return;
-        }
+      complete: function(results){
+        allRows = results.data || [];
+        headers = results.meta.fields || [];
 
-        const columns = Object.keys(results.data[0]).map((k) => ({
-          title: k,
-          data: k,
-        }));
+        expColName = detectExpCol();
 
-        $("#t").DataTable({
-          data: results.data,
-          columns: columns,
-          order: [],
-          pageLength: 25,
-          lengthMenu: [10, 25, 50, 100],
-          deferRender: true,
-          autoWidth: false,
+        buildHeader();
+        buildDataTable(allRows);
+
+        // Buttons
+        document.getElementById("btnNotExp").addEventListener("click", function(){
+          showNotExpOnly();
+        });
+        document.getElementById("btnAll").addEventListener("click", function(){
+          showAllEntries();
+        });
+        document.getElementById("btnReset").addEventListener("click", function(){
+          resetAll();
         });
       },
-      error: function (err) {
-        alert("Failed to load latest.csv");
+      error: function(err){
+        document.getElementById("rowInfo").textContent = "CSV load failed";
         console.error(err);
-      },
+        alert("Failed to load latest.csv. Check GitHub Pages path / cache.");
+      }
     });
   </script>
 </body>
