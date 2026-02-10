@@ -5,11 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>OptionNote Dashboard</title>
 
-  <!-- DataTables CSS -->
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css"/>
 
   <style>
-    /* ===== White background ===== */
     html, body { height: 100%; }
     body{
       margin:0;
@@ -22,18 +20,9 @@
       margin: 0 auto;
       padding: 18px 14px 24px;
     }
-    h1{
-      margin: 0 0 10px;
-      font-size: 20px;
-      font-weight: 700;
-    }
-    .sub{
-      margin: 0 0 14px;
-      font-size: 13px;
-      color:#444;
-    }
+    h1{ margin:0 0 10px; font-size:20px; font-weight:700; }
+    .sub{ margin:0 0 14px; font-size:13px; color:#444; }
 
-    /* Control bar */
     .bar{
       display:flex;
       flex-wrap:wrap;
@@ -64,7 +53,6 @@
     }
     .spacer{ flex:1; }
 
-    /* Table look */
     table.dataTable{
       background:#fff !important;
       border:1px solid #ddd;
@@ -76,9 +64,9 @@
       color:#111 !important;
       border-bottom:1px solid #ddd !important;
       font-weight:700;
+      vertical-align: top;
     }
 
-    /* ===== Conditional styling classes ===== */
     tr.row-bull td{
       background: #92D050 !important; /* RGB(146,208,80) */
       color:#111 !important;
@@ -92,12 +80,8 @@
       color:#333 !important;
     }
 
-    /* keep hover readable */
-    table.dataTable.hover tbody tr:hover td{
-      filter: brightness(0.98);
-    }
+    table.dataTable.hover tbody tr:hover td{ filter: brightness(0.98); }
 
-    /* Column filter inputs in header (if you have) */
     .col-filter{
       width: 100%;
       box-sizing: border-box;
@@ -115,17 +99,18 @@
   <div class="wrap">
     <h1>OptionNote</h1>
     <p class="sub">
-      Data source: <span class="pill">docs/latest.csv</span>
+      Data: <span class="pill">latest.csv</span>
       <span id="rowInfo" class="pill">Loading…</span>
+      <span id="modeInfo" class="pill">Mode: ALL</span>
     </p>
 
     <div class="bar">
-      <button class="btn" id="btnNotExp">Show NotExp only</button>
-      <button class="btn" id="btnAll">Show ALL entries</button>
+      <button class="btn" id="btnNotExp">Show NotExp only (ALL in one page)</button>
+      <button class="btn" id="btnAll">Show ALL entries (ALL in one page)</button>
 
       <div class="spacer"></div>
 
-      <button class="btn" id="btnReset">Reset (clear search / sort / filters)</button>
+      <button class="btn" id="btnReset">Reset (reload page)</button>
     </div>
 
     <table id="tbl" class="display hover" style="width:100%">
@@ -136,30 +121,18 @@
     </table>
   </div>
 
-  <!-- jQuery + DataTables + PapaParse -->
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
   <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
   <script>
-    // ========= Config =========
-    const CSV_URL = "latest.csv"; // because index.html is in docs/
-    const DEFAULT_PAGE_LEN = 50;
-
-    // If your CSV still has "Exp?" column, use it. If not present, buttons will still work (show all).
+    const BASE_CSV = "latest.csv"; // index.html is in docs/
     const EXP_COL_CANDIDATES = ["Exp?", "Exp.", "Exp"];
 
-    // ========= State =========
     let dt = null;
     let allRows = [];
     let headers = [];
     let expColName = null;
-
-    // ========= Helpers =========
-    function findColIndex(name){
-      const idx = headers.indexOf(name);
-      return idx >= 0 ? idx : -1;
-    }
 
     function detectExpCol(){
       for(const c of EXP_COL_CANDIDATES){
@@ -178,14 +151,24 @@
       });
     }
 
+    function updateRowInfo(){
+      if(!dt) return;
+      const info = dt.page.info();
+      document.getElementById("rowInfo").textContent =
+        `Rows: ${info.recordsDisplay.toLocaleString()} / ${info.recordsTotal.toLocaleString()}`;
+    }
+
+    function setModeText(t){
+      document.getElementById("modeInfo").textContent = `Mode: ${t}`;
+    }
+
     function buildDataTable(data){
-      // Destroy if exists
       if(dt){
         dt.destroy();
         $("#tbl tbody").empty();
       }
 
-      // Populate body
+      // Fill body
       const tbody = document.querySelector("#tbl tbody");
       tbody.innerHTML = "";
       data.forEach(row => {
@@ -198,48 +181,42 @@
         tbody.appendChild(tr);
       });
 
-      // Init DataTables
       dt = $("#tbl").DataTable({
-        pageLength: DEFAULT_PAGE_LEN,
-        lengthMenu: [25, 50, 100, 250, 500],
-        order: [],                 // start unsorted
+        // IMPORTANT: enable All (-1) option
+        pageLength: -1,  // default: ALL in one page
+        lengthMenu: [[25,50,100,250,500,-1],[25,50,100,250,500,"All"]],
+        order: [],       // start unsorted
         deferRender: true,
         autoWidth: false,
-        // Row styling based on row data
+
         createdRow: function(row, dataArr){
-          // Map array back to object for easier lookup
           const obj = {};
           headers.forEach((h, i) => obj[h] = dataArr[i]);
 
           const flag = (obj["vecBullBearFlag"] || "").toString().trim().toUpperCase();
 
-          // FinalNetPrem numeric check (<=0 => grey)
           const premRaw = obj["FinalNetPrem"];
           const prem = parseFloat(String(premRaw || "").replace(/,/g, "").trim());
           const premIsNum = !Number.isNaN(prem);
 
-          // Priority: grey overrides bull/bear (as you requested)
           if(premIsNum && prem <= 0){
             row.classList.add("row-grey");
             return;
           }
-
           if(flag === "BULL") row.classList.add("row-bull");
           if(flag === "BEAR") row.classList.add("row-bear");
         },
+
         initComplete: function(){
           const api = this.api();
 
-          // Add per-column filters (inputs) on header (second row not used -> we inject inside header cells)
-          // If you already had your own filter UI, you can remove this block.
+          // column filter inputs
           api.columns().every(function(){
             const col = this;
             const th = $(col.header());
-
-            // Avoid duplicate inputs if re-init
             th.find("input.col-filter").remove();
 
-            const input = $('<input class="col-filter" type="text" placeholder="filter...">')
+            $('<input class="col-filter" type="text" placeholder="filter...">')
               .appendTo(th)
               .on("keyup change clear", function(){
                 if(col.search() !== this.value){
@@ -253,40 +230,41 @@
       });
 
       dt.on("draw", function(){ updateRowInfo(); });
-    }
-
-    function updateRowInfo(){
-      if(!dt) return;
-      const info = dt.page.info();
-      document.getElementById("rowInfo").textContent =
-        `Rows: ${info.recordsDisplay.toLocaleString()} / ${info.recordsTotal.toLocaleString()}`;
-    }
-
-    function resetAll(){
-      if(!dt) return;
-      dt.search("");
-      dt.columns().search("");
-      dt.order([]);     // back to original order
-      dt.page.len(DEFAULT_PAGE_LEN);
-      dt.draw();
+      updateRowInfo();
     }
 
     function showAllEntries(){
+      setModeText("ALL");
       buildDataTable(allRows);
+      // Force all in one page
+      dt.page.len(-1).draw(false);
     }
 
     function showNotExpOnly(){
+      setModeText("NotExp");
       if(!expColName){
-        // If Exp column not in CSV, just show all
+        // if no Exp column, fall back
         buildDataTable(allRows);
+        dt.page.len(-1).draw(false);
         return;
       }
       const filtered = allRows.filter(r => String(r[expColName] || "").trim().toLowerCase() === "notexp");
       buildDataTable(filtered);
+      dt.page.len(-1).draw(false);
     }
 
-    // ========= Load CSV =========
-    Papa.parse(CSV_URL, {
+    // Reset should behave like F5 (fresh reload)
+    function hardReload(){
+      // cache-bust query so CSV and HTML are refreshed
+      const url = new URL(window.location.href);
+      url.searchParams.set("v", Date.now().toString());
+      window.location.replace(url.toString());
+    }
+
+    // Load CSV (also cache-bust)
+    const csvUrl = `${BASE_CSV}?v=${Date.now()}`;
+
+    Papa.parse(csvUrl, {
       download: true,
       header: true,
       dynamicTyping: false,
@@ -294,27 +272,19 @@
       complete: function(results){
         allRows = results.data || [];
         headers = results.meta.fields || [];
-
         expColName = detectExpCol();
 
         buildHeader();
-        buildDataTable(allRows);
+        showAllEntries();
 
-        // Buttons
-        document.getElementById("btnNotExp").addEventListener("click", function(){
-          showNotExpOnly();
-        });
-        document.getElementById("btnAll").addEventListener("click", function(){
-          showAllEntries();
-        });
-        document.getElementById("btnReset").addEventListener("click", function(){
-          resetAll();
-        });
+        document.getElementById("btnNotExp").addEventListener("click", showNotExpOnly);
+        document.getElementById("btnAll").addEventListener("click", showAllEntries);
+        document.getElementById("btnReset").addEventListener("click", hardReload);
       },
       error: function(err){
         document.getElementById("rowInfo").textContent = "CSV load failed";
         console.error(err);
-        alert("Failed to load latest.csv. Check GitHub Pages path / cache.");
+        alert("Failed to load latest.csv. Check path / cache.");
       }
     });
   </script>
