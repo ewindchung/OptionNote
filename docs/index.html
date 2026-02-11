@@ -26,6 +26,31 @@
     h1{ margin:0 0 8px; font-size:20px; font-weight:700; }
     .sub{ margin:0 0 10px; font-size:13px; color:#444; }
 
+    /* Tabs */
+    .tabs{
+      display:flex;
+      gap:8px;
+      align-items:center;
+      margin: 8px 0 10px;
+      flex-wrap:wrap;
+    }
+    .tab{
+      border:1px solid #ccc;
+      background:#fff;
+      padding:7px 10px;
+      border-radius:999px;
+      cursor:pointer;
+      font-size:13px;
+      font-weight:700;
+      white-space:nowrap;
+      user-select:none;
+    }
+    .tab.active{
+      background:#111;
+      color:#fff;
+      border-color:#111;
+    }
+
     .bar{
       display:flex;
       flex-wrap:wrap;
@@ -89,10 +114,14 @@
       vertical-align: top;
     }
 
-    /* Row coloring */
+    /* Row coloring (KeyContracts only, keep original) */
     tr.row-bull td{ background:#92D050 !important; color:#111 !important; }
     tr.row-bear td{ background:#FFC000 !important; color:#111 !important; }
     tr.row-grey td{ background:#e6e6e6 !important; color:#333 !important; }
+
+    /* Cell coloring (Agg) */
+    td.cell-pos{ background:#92D050 !important; color:#111 !important; }
+    td.cell-neg{ background:#FFC000 !important; color:#111 !important; }
 
     .col-filter{
       width: 100%;
@@ -109,6 +138,7 @@
       .btn, .select{ font-size:14px; padding:8px 10px; }
       .col-filter{ font-size: 14px; padding: 6px 8px; }
       table.dataTable{ font-size: 12px; }
+      .tab{ font-size:14px; padding:8px 12px; }
     }
 
     /* FixedHeader clone style tweak (so it matches) */
@@ -116,45 +146,93 @@
     table.dataTable.fixedHeader-locked thead th{
       background:#f6f6f6 !important;
     }
+
+    /* Panels */
+    .panel{ display:none; }
+    .panel.active{ display:block; }
   </style>
 </head>
 
 <body>
   <div class="wrap">
     <h1>OptionNote</h1>
-    <p class="sub">
-      <span class="pill">latest.csv</span>
+
+    <div class="tabs">
+      <div class="tab active" id="tabKey">OpFlowKey</div>
+      <div class="tab" id="tabAgg">OpFlowAgg</div>
+      <span class="pill" id="activeCsvPill">latest.csv</span>
       <span id="rowInfo" class="pill">Loading…</span>
       <span id="metaInfo" class="pill">—</span>
-    </p>
-
-    <div class="bar">
-      <label class="pill">Range</label>
-      <select id="selRange" class="select">
-        <option value="all" selected>ALL</option>
-        <option value="1">Latest 1 month</option>
-        <option value="2">Latest 2 months</option>
-        <option value="3">Latest 3 months</option>
-        <option value="4">Latest 4 months</option>
-        <option value="5">Latest 5 months</option>
-        <option value="6">Latest 6 months</option>
-      </select>
-
-      <button class="btn" id="btnReverse">Reverse rows</button>
-      <button class="btn" id="btnReset">Reset (reload)</button>
-
-      <div class="spacer"></div>
-      <span class="pill">Use search box / column filters</span>
     </div>
 
-    <div class="table-wrap">
-      <table id="tbl" class="display hover" style="width:100%">
-        <thead>
-          <tr id="hdrRow"></tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+    <!-- ===================== -->
+    <!-- Panel: OpFlowKey (KEEP ORIGINAL LOGIC) -->
+    <!-- ===================== -->
+    <div class="panel active" id="panelKey">
+      <div class="bar">
+        <label class="pill">Range</label>
+        <select id="selRangeKey" class="select">
+          <option value="all" selected>ALL</option>
+          <option value="1">Latest 1 month</option>
+          <option value="2">Latest 2 months</option>
+          <option value="3">Latest 3 months</option>
+          <option value="4">Latest 4 months</option>
+          <option value="5">Latest 5 months</option>
+          <option value="6">Latest 6 months</option>
+        </select>
+
+        <button class="btn" id="btnReverseKey">Reverse rows</button>
+        <button class="btn" id="btnResetKey">Reset (reload)</button>
+
+        <div class="spacer"></div>
+        <span class="pill">Use search box / column filters</span>
+      </div>
+
+      <div class="table-wrap">
+        <table id="tblKey" class="display hover" style="width:100%">
+          <thead>
+            <tr id="hdrRowKey"></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </div>
+
+    <!-- ===================== -->
+    <!-- Panel: OpFlowAgg (NEW) -->
+    <!-- ===================== -->
+    <div class="panel" id="panelAgg">
+      <div class="bar">
+        <label class="pill">Range</label>
+        <select id="selRangeAgg" class="select">
+          <option value="all" selected>ALL</option>
+          <option value="1w">Latest 1 week</option>
+          <option value="2w">Latest 2 weeks</option>
+          <option value="3w">Latest 3 weeks</option>
+          <option value="6w">Latest 6 weeks</option>
+          <option value="1m">Latest 1 month</option>
+          <option value="2m">Latest 2 months</option>
+          <option value="3m">Latest 3 months</option>
+          <option value="5m">Latest 5 months</option>
+        </select>
+
+        <button class="btn" id="btnReverseAgg">Reverse rows</button>
+        <button class="btn" id="btnResetAgg">Reset (reload)</button>
+
+        <div class="spacer"></div>
+        <span class="pill">Cells >= 1,000,000 green | <= -1,000,000 orange</span>
+      </div>
+
+      <div class="table-wrap">
+        <table id="tblAgg" class="display hover" style="width:100%">
+          <thead>
+            <tr id="hdrRowAgg"></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
   </div>
 
   <!-- jQuery + DataTables + FixedHeader + PapaParse -->
@@ -164,21 +242,13 @@
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
   <script>
-    const BASE_CSV = "latest.csv";
-    const DATE_COL_CANDIDATES = ["CreatedDate", "As.Date", "As Date", "As.Date.", "AsDate"];
-
-    let dt = null;
-    let headers = [];
-    let allRows = [];
-    let workingRows = [];
-    let isReversed = false;
-    let dateCol = null;
-
-    function detectDateCol(){
-      for(const c of DATE_COL_CANDIDATES){
-        if(headers.includes(c)) return c;
-      }
-      return null;
+    // =========================
+    // Shared helpers
+    // =========================
+    function hardReload(){
+      const url = new URL(window.location.href);
+      url.searchParams.set("v", Date.now().toString());
+      window.location.replace(url.toString());
     }
 
     function parseDate(val){
@@ -186,9 +256,11 @@
       const s0 = String(val).trim();
       if(!s0) return null;
 
+      // try Date(...) parse
       let d = new Date(s0);
       if(!isNaN(d)) return d;
 
+      // try M/D/YYYY
       const m = s0.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
       if(m){
         const mm = parseInt(m[1],10);
@@ -197,6 +269,14 @@
         d = new Date(yy, mm-1, dd);
         if(!isNaN(d)) return d;
       }
+
+      // try YYYYMMDD
+      const m2 = s0.match(/^(\d{4})(\d{2})(\d{2})$/);
+      if(m2){
+        d = new Date(parseInt(m2[1],10), parseInt(m2[2],10)-1, parseInt(m2[3],10));
+        if(!isNaN(d)) return d;
+      }
+
       return null;
     }
 
@@ -205,38 +285,108 @@
       return new Date(now.getFullYear(), now.getMonth() - n, now.getDate());
     }
 
-    function buildHeader(){
-      const hdr = document.getElementById("hdrRow");
-      hdr.innerHTML = "";
-      headers.forEach(h => {
-        const th = document.createElement("th");
-        th.textContent = h;
-        hdr.appendChild(th);
-      });
+    function daysAgoDate(days){
+      const now = new Date();
+      return new Date(now.getTime() - days*24*60*60*1000);
     }
 
-    function updateRowInfo(){
+    function parseMoney(val){
+      // handles commas and parentheses negatives: (123,456.00)
+      if(val == null) return null;
+      const s = String(val).trim();
+      if(!s) return null;
+
+      let neg = false;
+      let t = s;
+
+      if(t.startsWith("(") && t.endsWith(")")){
+        neg = true;
+        t = t.slice(1, -1);
+      }
+
+      t = t.replace(/,/g, "").trim();
+      const n = parseFloat(t);
+      if(Number.isNaN(n)) return null;
+      return neg ? -n : n;
+    }
+
+    function updateRowInfoFromDT(dt){
       if(!dt) return;
       const info = dt.page.info();
       document.getElementById("rowInfo").textContent =
         `Rows: ${info.recordsDisplay.toLocaleString()} / ${info.recordsTotal.toLocaleString()}`;
     }
 
+    // =========================
+    // TAB handling
+    // =========================
+    const tabKey = document.getElementById("tabKey");
+    const tabAgg = document.getElementById("tabAgg");
+    const panelKey = document.getElementById("panelKey");
+    const panelAgg = document.getElementById("panelAgg");
+    const activeCsvPill = document.getElementById("activeCsvPill");
+
+    function activateTab(which){
+      const isKey = (which === "KEY");
+      tabKey.classList.toggle("active", isKey);
+      tabAgg.classList.toggle("active", !isKey);
+      panelKey.classList.toggle("active", isKey);
+      panelAgg.classList.toggle("active", !isKey);
+      activeCsvPill.textContent = isKey ? "latest.csv" : "latestAgg.csv";
+
+      // update row info pill for the active table
+      if(isKey) updateRowInfoFromDT(dtKey);
+      else updateRowInfoFromDT(dtAgg);
+    }
+
+    tabKey.addEventListener("click", () => activateTab("KEY"));
+    tabAgg.addEventListener("click", () => activateTab("AGG"));
+
+    // =========================
+    // OpFlowKey (YOUR ORIGINAL, unchanged except ids)
+    // =========================
+    const BASE_CSV_KEY = "latest.csv";
+    const DATE_COL_CANDIDATES_KEY = ["CreatedDate", "As.Date", "As Date", "As.Date.", "AsDate"];
+
+    let dtKey = null;
+    let headersKey = [];
+    let allRowsKey = [];
+    let workingRowsKey = [];
+    let isReversedKey = false;
+    let dateColKey = null;
+
+    function detectDateColKey(){
+      for(const c of DATE_COL_CANDIDATES_KEY){
+        if(headersKey.includes(c)) return c;
+      }
+      return null;
+    }
+
+    function buildHeaderKey(){
+      const hdr = document.getElementById("hdrRowKey");
+      hdr.innerHTML = "";
+      headersKey.forEach(h => {
+        const th = document.createElement("th");
+        th.textContent = h;
+        hdr.appendChild(th);
+      });
+    }
+
     function setMeta(text){
       document.getElementById("metaInfo").textContent = text;
     }
 
-    function buildDataTable(data){
-      if(dt){
-        dt.destroy();
-        $("#tbl tbody").empty();
+    function buildDataTableKey(data){
+      if(dtKey){
+        dtKey.destroy();
+        $("#tblKey tbody").empty();
       }
 
-      const tbody = document.querySelector("#tbl tbody");
+      const tbody = document.querySelector("#tblKey tbody");
       tbody.innerHTML = "";
       data.forEach(row => {
         const tr = document.createElement("tr");
-        headers.forEach(h => {
+        headersKey.forEach(h => {
           const td = document.createElement("td");
           td.textContent = row[h] ?? "";
           tr.appendChild(td);
@@ -244,7 +394,7 @@
         tbody.appendChild(tr);
       });
 
-      dt = $("#tbl").DataTable({
+      dtKey = $("#tblKey").DataTable({
         pageLength: -1,
         lengthMenu: [[25,50,100,250,500,-1],[25,50,100,250,500,"All"]],
         order: [],
@@ -256,7 +406,7 @@
 
         createdRow: function(row, dataArr){
           const obj = {};
-          headers.forEach((h, i) => obj[h] = dataArr[i]);
+          headersKey.forEach((h, i) => obj[h] = dataArr[i]);
 
           const flag = (obj["vecBullBearFlag"] || "").toString().trim().toUpperCase();
 
@@ -290,74 +440,246 @@
               });
           });
 
-          updateRowInfo();
+          updateRowInfoFromDT(dtKey);
         }
       });
 
-      dt.on("draw", function(){ updateRowInfo(); });
-      updateRowInfo();
+      dtKey.on("draw", function(){ updateRowInfoFromDT(dtKey); });
+      updateRowInfoFromDT(dtKey);
     }
 
-    function applyRangeAndReverse(){
-      const sel = document.getElementById("selRange").value;
-      let rows = allRows.slice();
+    function applyRangeAndReverseKey(){
+      const sel = document.getElementById("selRangeKey").value;
+      let rows = allRowsKey.slice();
 
-      if(sel !== "all" && dateCol){
+      if(sel !== "all" && dateColKey){
         const n = parseInt(sel, 10);
         const cutoff = monthsAgoDate(n);
         rows = rows.filter(r => {
-          const d = parseDate(r[dateCol]);
+          const d = parseDate(r[dateColKey]);
           return d && d >= cutoff;
         });
       }
 
-      if(isReversed) rows.reverse();
+      if(isReversedKey) rows.reverse();
 
-      workingRows = rows;
-      buildDataTable(workingRows);
+      workingRowsKey = rows;
+      buildDataTableKey(workingRowsKey);
 
       const rangeText = (sel === "all") ? "ALL" : `Latest ${sel} month(s)`;
-      const revText = isReversed ? "Reversed" : "Normal";
-      const dateText = dateCol ? `DateCol=${dateCol}` : "DateCol=NONE";
-      setMeta(`${rangeText} | ${revText} | ${dateText}`);
+      const revText = isReversedKey ? "Reversed" : "Normal";
+      const dateText = dateColKey ? `DateCol=${dateColKey}` : "DateCol=NONE";
+      setMeta(`OpFlowKey | ${rangeText} | ${revText} | ${dateText}`);
     }
 
-    function hardReload(){
-      const url = new URL(window.location.href);
-      url.searchParams.set("v", Date.now().toString());
-      window.location.replace(url.toString());
+    // =========================
+    // OpFlowAgg (NEW)
+    // =========================
+    const BASE_CSV_AGG = "latestAgg.csv";
+    const DATE_COL_CANDIDATES_AGG = ["CreateDate", "CreatedDate", "As.Date", "As Date", "Date", "Created"];
+
+    let dtAgg = null;
+    let headersAgg = [];
+    let allRowsAgg = [];
+    let workingRowsAgg = [];
+    let isReversedAgg = false;
+    let dateColAgg = null;
+
+    function detectDateColAgg(){
+      for(const c of DATE_COL_CANDIDATES_AGG){
+        if(headersAgg.includes(c)) return c;
+      }
+      return null;
     }
 
-    const csvUrl = `${BASE_CSV}?v=${Date.now()}`;
+    function buildHeaderAgg(){
+      const hdr = document.getElementById("hdrRowAgg");
+      hdr.innerHTML = "";
+      headersAgg.forEach(h => {
+        const th = document.createElement("th");
+        th.textContent = h;
+        hdr.appendChild(th);
+      });
+    }
 
-    Papa.parse(csvUrl, {
-      download: true,
-      header: true,
-      dynamicTyping: false,
-      skipEmptyLines: true,
-      complete: function(results){
-        allRows = results.data || [];
-        headers = results.meta.fields || [];
-        dateCol = detectDateCol();
+    function buildDataTableAgg(data){
+      if(dtAgg){
+        dtAgg.destroy();
+        $("#tblAgg tbody").empty();
+      }
 
-        buildHeader();
-        applyRangeAndReverse();
+      const tbody = document.querySelector("#tblAgg tbody");
+      tbody.innerHTML = "";
+      data.forEach(row => {
+        const tr = document.createElement("tr");
+        headersAgg.forEach(h => {
+          const td = document.createElement("td");
+          td.textContent = row[h] ?? "";
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
 
-        document.getElementById("selRange").addEventListener("change", applyRangeAndReverse);
+      dtAgg = $("#tblAgg").DataTable({
+        pageLength: -1,
+        lengthMenu: [[50,100,200,300,500,-1],[50,100,200,300,500,"All"]],
+        order: [],
+        deferRender: true,
+        autoWidth: false,
 
-        document.getElementById("btnReverse").addEventListener("click", function(){
-          isReversed = !isReversed;
-          applyRangeAndReverse();
+        fixedHeader: true,
+
+        createdRow: function(row, dataArr){
+          // Per-cell coloring: >=1,000,000 green, <=-1,000,000 orange
+          // Apply to ALL numeric cells except maybe the first few ID cols; safest: scan all cells.
+          const tds = row.querySelectorAll("td");
+          for(let i=0;i<tds.length;i++){
+            const v = dataArr[i];
+            const n = parseMoney(v);
+            if(n == null) continue;
+
+            if(n >= 1000000) tds[i].classList.add("cell-pos");
+            else if(n <= -1000000) tds[i].classList.add("cell-neg");
+          }
+        },
+
+        initComplete: function(){
+          const api = this.api();
+
+          // per-column filters
+          api.columns().every(function(){
+            const col = this;
+            const th = $(col.header());
+            th.find("input.col-filter").remove();
+
+            $('<input class="col-filter" type="text" placeholder="filter...">')
+              .appendTo(th)
+              .on("keyup change clear", function(){
+                if(col.search() !== this.value){
+                  col.search(this.value).draw();
+                }
+              });
+          });
+
+          updateRowInfoFromDT(dtAgg);
+        }
+      });
+
+      dtAgg.on("draw", function(){ updateRowInfoFromDT(dtAgg); });
+      updateRowInfoFromDT(dtAgg);
+    }
+
+    function rangeAggToCutoff(sel){
+      if(sel === "all") return null;
+      if(sel === "1w") return daysAgoDate(7);
+      if(sel === "2w") return daysAgoDate(14);
+      if(sel === "3w") return daysAgoDate(21);
+      if(sel === "6w") return daysAgoDate(42);
+      if(sel === "1m") return monthsAgoDate(1);
+      if(sel === "2m") return monthsAgoDate(2);
+      if(sel === "3m") return monthsAgoDate(3);
+      if(sel === "5m") return monthsAgoDate(5);
+      return null;
+    }
+
+    function applyRangeAndReverseAgg(){
+      const sel = document.getElementById("selRangeAgg").value;
+      let rows = allRowsAgg.slice();
+
+      const cutoff = rangeAggToCutoff(sel);
+      if(cutoff && dateColAgg){
+        rows = rows.filter(r => {
+          const d = parseDate(r[dateColAgg]);
+          return d && d >= cutoff;
+        });
+      }
+
+      if(isReversedAgg) rows.reverse();
+
+      workingRowsAgg = rows;
+      buildDataTableAgg(workingRowsAgg);
+
+      const rangeText = (sel === "all") ? "ALL" : `Latest ${sel}`;
+      const revText = isReversedAgg ? "Reversed" : "Normal";
+      const dateText = dateColAgg ? `DateCol=${dateColAgg}` : "DateCol=NONE";
+      setMeta(`OpFlowAgg | ${rangeText} | ${revText} | ${dateText}`);
+    }
+
+    // =========================
+    // Load both CSVs
+    // =========================
+    function loadCsv(url, onOk, onFail){
+      Papa.parse(url, {
+        download: true,
+        header: true,
+        dynamicTyping: false,
+        skipEmptyLines: true,
+        complete: function(results){
+          onOk(results);
+        },
+        error: function(err){
+          onFail(err);
+        }
+      });
+    }
+
+    // Load Key
+    const csvUrlKey = `${BASE_CSV_KEY}?v=${Date.now()}`;
+    loadCsv(csvUrlKey,
+      function(results){
+        allRowsKey = results.data || [];
+        headersKey = results.meta.fields || [];
+        dateColKey = detectDateColKey();
+
+        buildHeaderKey();
+        applyRangeAndReverseKey();
+
+        document.getElementById("selRangeKey").addEventListener("change", applyRangeAndReverseKey);
+
+        document.getElementById("btnReverseKey").addEventListener("click", function(){
+          isReversedKey = !isReversedKey;
+          applyRangeAndReverseKey();
         });
 
-        document.getElementById("btnReset").addEventListener("click", hardReload);
+        document.getElementById("btnResetKey").addEventListener("click", hardReload);
+
+        // default tab already key
+        activateTab("KEY");
       },
-      error: function(err){
+      function(err){
         document.getElementById("rowInfo").textContent = "CSV load failed";
         console.error(err);
         alert("Failed to load latest.csv. Check path / cache.");
       }
-    });
+    );
+
+    // Load Agg
+    const csvUrlAgg = `${BASE_CSV_AGG}?v=${Date.now()}`;
+    loadCsv(csvUrlAgg,
+      function(results){
+        allRowsAgg = results.data || [];
+        headersAgg = results.meta.fields || [];
+        dateColAgg = detectDateColAgg();
+
+        buildHeaderAgg();
+        applyRangeAndReverseAgg();
+
+        document.getElementById("selRangeAgg").addEventListener("change", applyRangeAndReverseAgg);
+
+        document.getElementById("btnReverseAgg").addEventListener("click", function(){
+          isReversedAgg = !isReversedAgg;
+          applyRangeAndReverseAgg();
+        });
+
+        document.getElementById("btnResetAgg").addEventListener("click", hardReload);
+      },
+      function(err){
+        console.error(err);
+        // Don't block the whole page if Agg missing; just show a message in meta
+        // If user clicks Agg tab, they'll see empty table.
+        setMeta("OpFlowAgg load failed (latestAgg.csv missing?)");
+      }
+    );
   </script>
 </body>
 </html>
