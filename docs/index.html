@@ -53,35 +53,13 @@
     }
     .spacer{ flex:1; }
 
-    /* ===== Sticky header support for mobile: wrapper scroll ===== */
-    .table-wrap{
-      border:1px solid #ddd;
-      border-radius: 10px;
-      overflow: auto;                         /* key */
-      -webkit-overflow-scrolling: touch;      /* iOS smooth scroll */
-      background:#fff;
-    }
-
-    /* On phone, make a viewport-height scroll area so sticky header works reliably */
-    @media (max-width: 768px){
-      .wrap{ padding: 14px 10px 18px; }
-      .table-wrap{
-        max-height: 72vh;   /* scroll inside this container */
-      }
-    }
-
     table.dataTable{
       background:#fff !important;
-      border-collapse: separate !important;   /* helps sticky + borders */
-      border-spacing: 0 !important;
-      width: 100% !important;
+      border:1px solid #ddd;
+      border-radius: 10px;
+      overflow:hidden;
     }
-
-    /* ===== Sticky header (works inside .table-wrap) ===== */
     table.dataTable thead th{
-      position: sticky;
-      top: 0;
-      z-index: 5;
       background:#f6f6f6 !important;
       color:#111 !important;
       border-bottom:1px solid #ddd !important;
@@ -89,9 +67,18 @@
       vertical-align: top;
     }
 
-    tr.row-bull td{ background:#92D050 !important; color:#111 !important; }
-    tr.row-bear td{ background:#FFC000 !important; color:#111 !important; }
-    tr.row-grey td{ background:#e6e6e6 !important; color:#333 !important; }
+    tr.row-bull td{
+      background: #92D050 !important; /* RGB(146,208,80) */
+      color:#111 !important;
+    }
+    tr.row-bear td{
+      background: #FFC000 !important; /* RGB(255,192,0) */
+      color:#111 !important;
+    }
+    tr.row-grey td{
+      background: #e6e6e6 !important;
+      color:#333 !important;
+    }
 
     table.dataTable.hover tbody tr:hover td{ filter: brightness(0.98); }
 
@@ -104,13 +91,6 @@
       border-radius: 6px;
       margin-top: 6px;
       background: #fff;
-    }
-
-    /* Make search/filter inputs easier on phone */
-    @media (max-width: 768px){
-      .col-filter{ font-size: 14px; padding: 6px 8px; }
-      table.dataTable{ font-size: 12px; }
-      .btn{ padding: 8px 10px; }
     }
   </style>
 </head>
@@ -133,14 +113,12 @@
       <button class="btn" id="btnReset">Reset (reload page)</button>
     </div>
 
-    <div class="table-wrap">
-      <table id="tbl" class="display hover" style="width:100%">
-        <thead>
-          <tr id="hdrRow"></tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
+    <table id="tbl" class="display hover" style="width:100%">
+      <thead>
+        <tr id="hdrRow"></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
   </div>
 
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
@@ -148,7 +126,7 @@
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
   <script>
-    const BASE_CSV = "latest.csv";
+    const BASE_CSV = "latest.csv"; // index.html is in docs/
     const EXP_COL_CANDIDATES = ["Exp?", "Exp.", "Exp"];
 
     let dt = null;
@@ -190,6 +168,7 @@
         $("#tbl tbody").empty();
       }
 
+      // Fill body
       const tbody = document.querySelector("#tbl tbody");
       tbody.innerHTML = "";
       data.forEach(row => {
@@ -203,9 +182,10 @@
       });
 
       dt = $("#tbl").DataTable({
-        pageLength: -1,
+        // IMPORTANT: enable All (-1) option
+        pageLength: -1,  // default: ALL in one page
         lengthMenu: [[25,50,100,250,500,-1],[25,50,100,250,500,"All"]],
-        order: [],
+        order: [],       // start unsorted
         deferRender: true,
         autoWidth: false,
 
@@ -230,6 +210,7 @@
         initComplete: function(){
           const api = this.api();
 
+          // column filter inputs
           api.columns().every(function(){
             const col = this;
             const th = $(col.header());
@@ -255,12 +236,14 @@
     function showAllEntries(){
       setModeText("ALL");
       buildDataTable(allRows);
+      // Force all in one page
       dt.page.len(-1).draw(false);
     }
 
     function showNotExpOnly(){
       setModeText("NotExp");
       if(!expColName){
+        // if no Exp column, fall back
         buildDataTable(allRows);
         dt.page.len(-1).draw(false);
         return;
@@ -270,12 +253,15 @@
       dt.page.len(-1).draw(false);
     }
 
+    // Reset should behave like F5 (fresh reload)
     function hardReload(){
+      // cache-bust query so CSV and HTML are refreshed
       const url = new URL(window.location.href);
       url.searchParams.set("v", Date.now().toString());
       window.location.replace(url.toString());
     }
 
+    // Load CSV (also cache-bust)
     const csvUrl = `${BASE_CSV}?v=${Date.now()}`;
 
     Papa.parse(csvUrl, {
