@@ -12,37 +12,45 @@
     body{
       margin:0;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      background: #ffffff;
+      background:#ffffff;
       color:#111;
     }
     .wrap{
       max-width: 1400px;
       margin: 0 auto;
-      padding: 18px 14px 24px;
+      padding: 16px 12px 20px;
     }
-    h1{ margin:0 0 10px; font-size:20px; font-weight:700; }
-    .sub{ margin:0 0 14px; font-size:13px; color:#444; }
+    h1{ margin:0 0 8px; font-size:20px; font-weight:700; }
+    .sub{ margin:0 0 10px; font-size:13px; color:#444; }
 
     .bar{
       display:flex;
       flex-wrap:wrap;
       gap:10px;
       align-items:center;
-      margin: 10px 0 14px;
+      margin: 10px 0 12px;
       padding: 10px;
       border: 1px solid #ddd;
       border-radius: 10px;
-      background: #fafafa;
+      background:#fafafa;
     }
     .btn{
       border:1px solid #ccc;
       background:#fff;
-      padding:6px 10px;
+      padding:7px 10px;
       border-radius:8px;
       cursor:pointer;
       font-size: 13px;
+      white-space: nowrap;
     }
     .btn:hover{ background:#f2f2f2; }
+    .select{
+      border:1px solid #ccc;
+      background:#fff;
+      padding:7px 10px;
+      border-radius:8px;
+      font-size: 13px;
+    }
     .pill{
       font-size:12px;
       padding:4px 8px;
@@ -50,16 +58,38 @@
       border:1px solid #ddd;
       background:#fff;
       color:#333;
+      white-space: nowrap;
     }
     .spacer{ flex:1; }
 
-    table.dataTable{
-      background:#fff !important;
+    /* ===== Table wrapper =====
+       Desktop: normal page scroll is fine.
+       Mobile: make a scroll area so header sticky works reliably after reaching table.
+    */
+    .table-wrap{
       border:1px solid #ddd;
       border-radius: 10px;
-      overflow:hidden;
+      overflow: auto;
+      -webkit-overflow-scrolling: touch;
+      background:#fff;
     }
+    @media (max-width: 768px){
+      .table-wrap{ max-height: 72vh; }
+      .btn, .select{ font-size:14px; padding:8px 10px; }
+    }
+
+    table.dataTable{
+      background:#fff !important;
+      border-collapse: separate !important;
+      border-spacing: 0 !important;
+      width:100% !important;
+    }
+
+    /* Sticky header inside table-wrap */
     table.dataTable thead th{
+      position: sticky;
+      top: 0;
+      z-index: 5;
       background:#f6f6f6 !important;
       color:#111 !important;
       border-bottom:1px solid #ddd !important;
@@ -67,20 +97,9 @@
       vertical-align: top;
     }
 
-    tr.row-bull td{
-      background: #92D050 !important; /* RGB(146,208,80) */
-      color:#111 !important;
-    }
-    tr.row-bear td{
-      background: #FFC000 !important; /* RGB(255,192,0) */
-      color:#111 !important;
-    }
-    tr.row-grey td{
-      background: #e6e6e6 !important;
-      color:#333 !important;
-    }
-
-    table.dataTable.hover tbody tr:hover td{ filter: brightness(0.98); }
+    tr.row-bull td{ background:#92D050 !important; color:#111 !important; }
+    tr.row-bear td{ background:#FFC000 !important; color:#111 !important; }
+    tr.row-grey td{ background:#e6e6e6 !important; color:#333 !important; }
 
     .col-filter{
       width: 100%;
@@ -90,7 +109,11 @@
       border: 1px solid #ccc;
       border-radius: 6px;
       margin-top: 6px;
-      background: #fff;
+      background:#fff;
+    }
+    @media (max-width: 768px){
+      .col-filter{ font-size: 14px; padding: 6px 8px; }
+      table.dataTable{ font-size: 12px; }
     }
   </style>
 </head>
@@ -99,26 +122,38 @@
   <div class="wrap">
     <h1>OptionNote</h1>
     <p class="sub">
-      Data: <span class="pill">latest.csv</span>
+      <span class="pill">latest.csv</span>
       <span id="rowInfo" class="pill">Loading…</span>
-      <span id="modeInfo" class="pill">Mode: ALL</span>
+      <span id="metaInfo" class="pill">—</span>
     </p>
 
     <div class="bar">
-      <button class="btn" id="btnNotExp">Show NotExp only (ALL in one page)</button>
-      <button class="btn" id="btnAll">Show ALL entries (ALL in one page)</button>
+      <label class="pill">Range</label>
+      <select id="selRange" class="select">
+        <option value="all" selected>ALL</option>
+        <option value="1">Latest 1 month</option>
+        <option value="2">Latest 2 months</option>
+        <option value="3">Latest 3 months</option>
+        <option value="4">Latest 4 months</option>
+        <option value="5">Latest 5 months</option>
+        <option value="6">Latest 6 months</option>
+      </select>
+
+      <button class="btn" id="btnReverse">Reverse rows</button>
+      <button class="btn" id="btnReset">Reset (reload)</button>
 
       <div class="spacer"></div>
-
-      <button class="btn" id="btnReset">Reset (reload page)</button>
+      <span class="pill">Tip: use search box / column filters</span>
     </div>
 
-    <table id="tbl" class="display hover" style="width:100%">
-      <thead>
-        <tr id="hdrRow"></tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+    <div class="table-wrap" id="tableWrap">
+      <table id="tbl" class="display hover" style="width:100%">
+        <thead>
+          <tr id="hdrRow"></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
   </div>
 
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
@@ -126,19 +161,49 @@
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
   <script>
-    const BASE_CSV = "latest.csv"; // index.html is in docs/
-    const EXP_COL_CANDIDATES = ["Exp?", "Exp.", "Exp"];
+    const BASE_CSV = "latest.csv";
+    const DATE_COL_CANDIDATES = ["CreatedDate", "As.Date", "As Date", "As.Date.", "AsDate"];
 
     let dt = null;
-    let allRows = [];
     let headers = [];
-    let expColName = null;
+    let allRows = [];       // raw rows
+    let workingRows = [];   // after range + reverse
+    let isReversed = false;
+    let dateCol = null;
 
-    function detectExpCol(){
-      for(const c of EXP_COL_CANDIDATES){
+    function detectDateCol(){
+      for(const c of DATE_COL_CANDIDATES){
         if(headers.includes(c)) return c;
       }
       return null;
+    }
+
+    function parseDate(val){
+      // Accept: YYYY-MM-DD, YYYY/MM/DD, M/D/YYYY, MM/DD/YYYY
+      if(val == null) return null;
+      const s0 = String(val).trim();
+      if(!s0) return null;
+
+      // If already ISO-like
+      let d = new Date(s0);
+      if(!isNaN(d)) return d;
+
+      // Try M/D/YYYY or MM/DD/YYYY
+      const m = s0.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      if(m){
+        const mm = parseInt(m[1],10);
+        const dd = parseInt(m[2],10);
+        const yy = parseInt(m[3],10);
+        d = new Date(yy, mm-1, dd);
+        if(!isNaN(d)) return d;
+      }
+      return null;
+    }
+
+    function monthsAgoDate(n){
+      const now = new Date();
+      const d = new Date(now.getFullYear(), now.getMonth() - n, now.getDate());
+      return d;
     }
 
     function buildHeader(){
@@ -158,8 +223,8 @@
         `Rows: ${info.recordsDisplay.toLocaleString()} / ${info.recordsTotal.toLocaleString()}`;
     }
 
-    function setModeText(t){
-      document.getElementById("modeInfo").textContent = `Mode: ${t}`;
+    function setMeta(text){
+      document.getElementById("metaInfo").textContent = text;
     }
 
     function buildDataTable(data){
@@ -168,7 +233,6 @@
         $("#tbl tbody").empty();
       }
 
-      // Fill body
       const tbody = document.querySelector("#tbl tbody");
       tbody.innerHTML = "";
       data.forEach(row => {
@@ -182,10 +246,9 @@
       });
 
       dt = $("#tbl").DataTable({
-        // IMPORTANT: enable All (-1) option
-        pageLength: -1,  // default: ALL in one page
+        pageLength: -1, // always show ALL rows in one page
         lengthMenu: [[25,50,100,250,500,-1],[25,50,100,250,500,"All"]],
-        order: [],       // start unsorted
+        order: [],      // no initial sort
         deferRender: true,
         autoWidth: false,
 
@@ -199,6 +262,7 @@
           const prem = parseFloat(String(premRaw || "").replace(/,/g, "").trim());
           const premIsNum = !Number.isNaN(prem);
 
+          // Grey overrides bull/bear
           if(premIsNum && prem <= 0){
             row.classList.add("row-grey");
             return;
@@ -210,7 +274,7 @@
         initComplete: function(){
           const api = this.api();
 
-          // column filter inputs
+          // per-column filters
           api.columns().every(function(){
             const col = this;
             const th = $(col.header());
@@ -233,35 +297,43 @@
       updateRowInfo();
     }
 
-    function showAllEntries(){
-      setModeText("ALL");
-      buildDataTable(allRows);
-      // Force all in one page
-      dt.page.len(-1).draw(false);
-    }
+    function applyRangeAndReverse(){
+      const sel = document.getElementById("selRange").value;
 
-    function showNotExpOnly(){
-      setModeText("NotExp");
-      if(!expColName){
-        // if no Exp column, fall back
-        buildDataTable(allRows);
-        dt.page.len(-1).draw(false);
-        return;
+      let rows = allRows.slice();
+
+      // Range filter by date (if date column exists)
+      if(sel !== "all" && dateCol){
+        const n = parseInt(sel, 10);
+        const cutoff = monthsAgoDate(n);
+
+        rows = rows.filter(r => {
+          const d = parseDate(r[dateCol]);
+          return d && d >= cutoff;
+        });
       }
-      const filtered = allRows.filter(r => String(r[expColName] || "").trim().toLowerCase() === "notexp");
-      buildDataTable(filtered);
-      dt.page.len(-1).draw(false);
+
+      // Reverse rows if requested
+      if(isReversed){
+        rows.reverse();
+      }
+
+      workingRows = rows;
+      buildDataTable(workingRows);
+
+      const rangeText = (sel === "all") ? "ALL" : `Latest ${sel} month(s)`;
+      const revText = isReversed ? "Reversed" : "Normal";
+      const dateText = dateCol ? `DateCol=${dateCol}` : "DateCol=NONE";
+      setMeta(`${rangeText} | ${revText} | ${dateText}`);
     }
 
-    // Reset should behave like F5 (fresh reload)
     function hardReload(){
-      // cache-bust query so CSV and HTML are refreshed
       const url = new URL(window.location.href);
       url.searchParams.set("v", Date.now().toString());
       window.location.replace(url.toString());
     }
 
-    // Load CSV (also cache-bust)
+    // Load CSV (cache-bust)
     const csvUrl = `${BASE_CSV}?v=${Date.now()}`;
 
     Papa.parse(csvUrl, {
@@ -272,13 +344,19 @@
       complete: function(results){
         allRows = results.data || [];
         headers = results.meta.fields || [];
-        expColName = detectExpCol();
+
+        dateCol = detectDateCol();
 
         buildHeader();
-        showAllEntries();
+        applyRangeAndReverse();
 
-        document.getElementById("btnNotExp").addEventListener("click", showNotExpOnly);
-        document.getElementById("btnAll").addEventListener("click", showAllEntries);
+        document.getElementById("selRange").addEventListener("change", applyRangeAndReverse);
+
+        document.getElementById("btnReverse").addEventListener("click", function(){
+          isReversed = !isReversed;
+          applyRangeAndReverse();
+        });
+
         document.getElementById("btnReset").addEventListener("click", hardReload);
       },
       error: function(err){
