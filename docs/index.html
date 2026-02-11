@@ -5,7 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>OptionNote Dashboard</title>
 
+  <!-- DataTables -->
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css"/>
+  <!-- FixedHeader (IMPORTANT) -->
+  <link rel="stylesheet" href="https://cdn.datatables.net/fixedheader/3.4.0/css/fixedHeader.dataTables.min.css"/>
 
   <style>
     html, body { height: 100%; }
@@ -62,20 +65,12 @@
     }
     .spacer{ flex:1; }
 
-    /* ===== Table wrapper =====
-       Desktop: normal page scroll is fine.
-       Mobile: make a scroll area so header sticky works reliably after reaching table.
-    */
+    /* Table container */
     .table-wrap{
       border:1px solid #ddd;
       border-radius: 10px;
-      overflow: auto;
-      -webkit-overflow-scrolling: touch;
+      overflow: visible;   /* IMPORTANT: FixedHeader works best with normal page scroll */
       background:#fff;
-    }
-    @media (max-width: 768px){
-      .table-wrap{ max-height: 72vh; }
-      .btn, .select{ font-size:14px; padding:8px 10px; }
     }
 
     table.dataTable{
@@ -85,11 +80,8 @@
       width:100% !important;
     }
 
-    /* Sticky header inside table-wrap */
+    /* Header look */
     table.dataTable thead th{
-      position: sticky;
-      top: 0;
-      z-index: 5;
       background:#f6f6f6 !important;
       color:#111 !important;
       border-bottom:1px solid #ddd !important;
@@ -97,6 +89,7 @@
       vertical-align: top;
     }
 
+    /* Row coloring */
     tr.row-bull td{ background:#92D050 !important; color:#111 !important; }
     tr.row-bear td{ background:#FFC000 !important; color:#111 !important; }
     tr.row-grey td{ background:#e6e6e6 !important; color:#333 !important; }
@@ -111,9 +104,17 @@
       margin-top: 6px;
       background:#fff;
     }
+
     @media (max-width: 768px){
+      .btn, .select{ font-size:14px; padding:8px 10px; }
       .col-filter{ font-size: 14px; padding: 6px 8px; }
       table.dataTable{ font-size: 12px; }
+    }
+
+    /* FixedHeader clone style tweak (so it matches) */
+    table.dataTable.fixedHeader-floating thead th,
+    table.dataTable.fixedHeader-locked thead th{
+      background:#f6f6f6 !important;
     }
   </style>
 </head>
@@ -143,10 +144,10 @@
       <button class="btn" id="btnReset">Reset (reload)</button>
 
       <div class="spacer"></div>
-      <span class="pill">Tip: use search box / column filters</span>
+      <span class="pill">Use search box / column filters</span>
     </div>
 
-    <div class="table-wrap" id="tableWrap">
+    <div class="table-wrap">
       <table id="tbl" class="display hover" style="width:100%">
         <thead>
           <tr id="hdrRow"></tr>
@@ -156,8 +157,10 @@
     </div>
   </div>
 
+  <!-- jQuery + DataTables + FixedHeader + PapaParse -->
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
   <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/fixedheader/3.4.0/js/dataTables.fixedHeader.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
   <script>
@@ -166,8 +169,8 @@
 
     let dt = null;
     let headers = [];
-    let allRows = [];       // raw rows
-    let workingRows = [];   // after range + reverse
+    let allRows = [];
+    let workingRows = [];
     let isReversed = false;
     let dateCol = null;
 
@@ -179,16 +182,13 @@
     }
 
     function parseDate(val){
-      // Accept: YYYY-MM-DD, YYYY/MM/DD, M/D/YYYY, MM/DD/YYYY
       if(val == null) return null;
       const s0 = String(val).trim();
       if(!s0) return null;
 
-      // If already ISO-like
       let d = new Date(s0);
       if(!isNaN(d)) return d;
 
-      // Try M/D/YYYY or MM/DD/YYYY
       const m = s0.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
       if(m){
         const mm = parseInt(m[1],10);
@@ -202,8 +202,7 @@
 
     function monthsAgoDate(n){
       const now = new Date();
-      const d = new Date(now.getFullYear(), now.getMonth() - n, now.getDate());
-      return d;
+      return new Date(now.getFullYear(), now.getMonth() - n, now.getDate());
     }
 
     function buildHeader(){
@@ -246,11 +245,14 @@
       });
 
       dt = $("#tbl").DataTable({
-        pageLength: -1, // always show ALL rows in one page
+        pageLength: -1,
         lengthMenu: [[25,50,100,250,500,-1],[25,50,100,250,500,"All"]],
-        order: [],      // no initial sort
+        order: [],
         deferRender: true,
         autoWidth: false,
+
+        // IMPORTANT: this is what makes header lock on PC + phone reliably
+        fixedHeader: true,
 
         createdRow: function(row, dataArr){
           const obj = {};
@@ -262,7 +264,6 @@
           const prem = parseFloat(String(premRaw || "").replace(/,/g, "").trim());
           const premIsNum = !Number.isNaN(prem);
 
-          // Grey overrides bull/bear
           if(premIsNum && prem <= 0){
             row.classList.add("row-grey");
             return;
@@ -299,24 +300,18 @@
 
     function applyRangeAndReverse(){
       const sel = document.getElementById("selRange").value;
-
       let rows = allRows.slice();
 
-      // Range filter by date (if date column exists)
       if(sel !== "all" && dateCol){
         const n = parseInt(sel, 10);
         const cutoff = monthsAgoDate(n);
-
         rows = rows.filter(r => {
           const d = parseDate(r[dateCol]);
           return d && d >= cutoff;
         });
       }
 
-      // Reverse rows if requested
-      if(isReversed){
-        rows.reverse();
-      }
+      if(isReversed) rows.reverse();
 
       workingRows = rows;
       buildDataTable(workingRows);
@@ -333,7 +328,6 @@
       window.location.replace(url.toString());
     }
 
-    // Load CSV (cache-bust)
     const csvUrl = `${BASE_CSV}?v=${Date.now()}`;
 
     Papa.parse(csvUrl, {
@@ -344,7 +338,6 @@
       complete: function(results){
         allRows = results.data || [];
         headers = results.meta.fields || [];
-
         dateCol = detectDateCol();
 
         buildHeader();
