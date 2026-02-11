@@ -5,10 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>OptionNote Dashboard</title>
 
-  <!-- DataTables -->
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css"/>
-  <!-- FixedHeader -->
-  <link rel="stylesheet" href="https://cdn.datatables.net/fixedheader/3.4.0/css/fixedHeader.dataTables.min.css"/>
 
   <style>
     html, body { height: 100%; }
@@ -56,21 +53,35 @@
     }
     .spacer{ flex:1; }
 
-    select{
-      border:1px solid #ccc;
+    /* ===== Sticky header support for mobile: wrapper scroll ===== */
+    .table-wrap{
+      border:1px solid #ddd;
+      border-radius: 10px;
+      overflow: auto;                         /* key */
+      -webkit-overflow-scrolling: touch;      /* iOS smooth scroll */
       background:#fff;
-      padding:6px 10px;
-      border-radius:8px;
-      font-size: 13px;
+    }
+
+    /* On phone, make a viewport-height scroll area so sticky header works reliably */
+    @media (max-width: 768px){
+      .wrap{ padding: 14px 10px 18px; }
+      .table-wrap{
+        max-height: 72vh;   /* scroll inside this container */
+      }
     }
 
     table.dataTable{
       background:#fff !important;
-      border:1px solid #ddd;
-      border-radius: 10px;
-      overflow:hidden;
+      border-collapse: separate !important;   /* helps sticky + borders */
+      border-spacing: 0 !important;
+      width: 100% !important;
     }
+
+    /* ===== Sticky header (works inside .table-wrap) ===== */
     table.dataTable thead th{
+      position: sticky;
+      top: 0;
+      z-index: 5;
       background:#f6f6f6 !important;
       color:#111 !important;
       border-bottom:1px solid #ddd !important;
@@ -78,18 +89,9 @@
       vertical-align: top;
     }
 
-    tr.row-bull td{
-      background: #92D050 !important; /* RGB(146,208,80) */
-      color:#111 !important;
-    }
-    tr.row-bear td{
-      background: #FFC000 !important; /* RGB(255,192,0) */
-      color:#111 !important;
-    }
-    tr.row-grey td{
-      background: #e6e6e6 !important;
-      color:#333 !important;
-    }
+    tr.row-bull td{ background:#92D050 !important; color:#111 !important; }
+    tr.row-bear td{ background:#FFC000 !important; color:#111 !important; }
+    tr.row-grey td{ background:#e6e6e6 !important; color:#333 !important; }
 
     table.dataTable.hover tbody tr:hover td{ filter: brightness(0.98); }
 
@@ -104,11 +106,11 @@
       background: #fff;
     }
 
-    /* make FixedHeader look consistent */
-    table.dataTable.fixedHeader-floating{
-      border:1px solid #ddd;
-      border-radius: 10px;
-      overflow:hidden;
+    /* Make search/filter inputs easier on phone */
+    @media (max-width: 768px){
+      .col-filter{ font-size: 14px; padding: 6px 8px; }
+      table.dataTable{ font-size: 12px; }
+      .btn{ padding: 8px 10px; }
     }
   </style>
 </head>
@@ -120,74 +122,45 @@
       Data: <span class="pill">latest.csv</span>
       <span id="rowInfo" class="pill">Loading…</span>
       <span id="modeInfo" class="pill">Mode: ALL</span>
-      <span id="revInfo" class="pill">Order: normal</span>
     </p>
 
     <div class="bar">
-      <label class="pill" for="ddMonths">Show:</label>
-      <select id="ddMonths">
-        <option value="all">All</option>
-        <option value="1">Latest 1 month</option>
-        <option value="2">Latest 2 months</option>
-        <option value="3">Latest 3 months</option>
-        <option value="4">Latest 4 months</option>
-        <option value="5">Latest 5 months</option>
-        <option value="6">Latest 6 months</option>
-      </select>
-
-      <button class="btn" id="btnNotExp">NotExp only (ALL in one page)</button>
-      <button class="btn" id="btnAll">All entries (ALL in one page)</button>
+      <button class="btn" id="btnNotExp">Show NotExp only (ALL in one page)</button>
+      <button class="btn" id="btnAll">Show ALL entries (ALL in one page)</button>
 
       <div class="spacer"></div>
 
-      <button class="btn" id="btnReverse">Reverse rows</button>
       <button class="btn" id="btnReset">Reset (reload page)</button>
     </div>
 
-    <table id="tbl" class="display hover" style="width:100%">
-      <thead>
-        <tr id="hdrRow"></tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+    <div class="table-wrap">
+      <table id="tbl" class="display hover" style="width:100%">
+        <thead>
+          <tr id="hdrRow"></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
   </div>
 
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
   <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
-  <script src="https://cdn.datatables.net/fixedheader/3.4.0/js/dataTables.fixedHeader.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
   <script>
-    const BASE_CSV = "latest.csv"; // index.html is in docs/
+    const BASE_CSV = "latest.csv";
     const EXP_COL_CANDIDATES = ["Exp?", "Exp.", "Exp"];
-    const CREATED_DATE_CANDIDATES = ["CreatedDate", "Created Date", "Created_Date"];
 
     let dt = null;
     let allRows = [];
     let headers = [];
     let expColName = null;
-    let createdDateCol = null;
 
-    // State
-    let currentMode = "ALL"; // ALL / NotExp
-    let monthsWindow = "all"; // 'all' or '1'...'6'
-    let reversed = false;
-
-    function detectCol(cands){
-      for(const c of cands){
+    function detectExpCol(){
+      for(const c of EXP_COL_CANDIDATES){
         if(headers.includes(c)) return c;
       }
       return null;
-    }
-
-    function setModeText(){
-      let m = currentMode;
-      if(monthsWindow !== "all") m += ` | last ${monthsWindow}m`;
-      document.getElementById("modeInfo").textContent = `Mode: ${m}`;
-    }
-
-    function setRevText(){
-      document.getElementById("revInfo").textContent = `Order: ${reversed ? "reversed" : "normal"}`;
     }
 
     function buildHeader(){
@@ -207,57 +180,8 @@
         `Rows: ${info.recordsDisplay.toLocaleString()} / ${info.recordsTotal.toLocaleString()}`;
     }
 
-    // Parse CreatedDate:
-    // supports "YYYY-MM-DD", "M/D/YYYY", "MM/DD/YYYY"
-    function parseDateAny(s){
-      if(!s) return null;
-      const t = String(s).trim();
-      if(!t) return null;
-
-      // YYYY-MM-DD
-      let m = t.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-      if(m){
-        const y = +m[1], mo = +m[2]-1, d = +m[3];
-        const dt = new Date(y, mo, d);
-        return isNaN(dt.getTime()) ? null : dt;
-      }
-
-      // M/D/YYYY or MM/DD/YYYY
-      m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-      if(m){
-        const mo = +m[1]-1, d = +m[2], y = +m[3];
-        const dt = new Date(y, mo, d);
-        return isNaN(dt.getTime()) ? null : dt;
-      }
-
-      return null;
-    }
-
-    function monthsAgoDate(n){
-      const now = new Date();
-      const d = new Date(now.getFullYear(), now.getMonth() - n, now.getDate());
-      d.setHours(0,0,0,0);
-      return d;
-    }
-
-    function applyFiltersBase(rows){
-      let out = rows;
-
-      // months filter
-      if(monthsWindow !== "all" && createdDateCol){
-        const cutoff = monthsAgoDate(parseInt(monthsWindow, 10));
-        out = out.filter(r => {
-          const dt = parseDateAny(r[createdDateCol]);
-          return dt && dt >= cutoff;
-        });
-      }
-
-      // Exp? filter
-      if(currentMode === "NotExp" && expColName){
-        out = out.filter(r => String(r[expColName] || "").trim().toLowerCase() === "notexp");
-      }
-
-      return out;
+    function setModeText(t){
+      document.getElementById("modeInfo").textContent = `Mode: ${t}`;
     }
 
     function buildDataTable(data){
@@ -266,7 +190,6 @@
         $("#tbl tbody").empty();
       }
 
-      // Fill body
       const tbody = document.querySelector("#tbl tbody");
       tbody.innerHTML = "";
       data.forEach(row => {
@@ -280,12 +203,11 @@
       });
 
       dt = $("#tbl").DataTable({
-        pageLength: -1, // ALL in one page
+        pageLength: -1,
         lengthMenu: [[25,50,100,250,500,-1],[25,50,100,250,500,"All"]],
-        order: [],      // start unsorted
+        order: [],
         deferRender: true,
         autoWidth: false,
-        fixedHeader: true, // sticky header
 
         createdRow: function(row, dataArr){
           const obj = {};
@@ -330,20 +252,22 @@
       updateRowInfo();
     }
 
-    function refreshView(){
-      // start from base order
-      let base = allRows.slice();
+    function showAllEntries(){
+      setModeText("ALL");
+      buildDataTable(allRows);
+      dt.page.len(-1).draw(false);
+    }
 
-      // apply reverse if toggled (reverse the current base order)
-      if(reversed) base.reverse();
-
-      // apply mode/month filters
-      const filtered = applyFiltersBase(base);
-
+    function showNotExpOnly(){
+      setModeText("NotExp");
+      if(!expColName){
+        buildDataTable(allRows);
+        dt.page.len(-1).draw(false);
+        return;
+      }
+      const filtered = allRows.filter(r => String(r[expColName] || "").trim().toLowerCase() === "notexp");
       buildDataTable(filtered);
-      setModeText();
-      setRevText();
-      dt.page.len(-1).draw(false); // ensure single page
+      dt.page.len(-1).draw(false);
     }
 
     function hardReload(){
@@ -352,7 +276,6 @@
       window.location.replace(url.toString());
     }
 
-    // Load CSV with cache-bust
     const csvUrl = `${BASE_CSV}?v=${Date.now()}`;
 
     Papa.parse(csvUrl, {
@@ -363,36 +286,13 @@
       complete: function(results){
         allRows = results.data || [];
         headers = results.meta.fields || [];
-
-        expColName = detectCol(EXP_COL_CANDIDATES);
-        createdDateCol = detectCol(CREATED_DATE_CANDIDATES);
+        expColName = detectExpCol();
 
         buildHeader();
+        showAllEntries();
 
-        // initial view
-        refreshView();
-
-        // UI handlers
-        document.getElementById("ddMonths").addEventListener("change", function(){
-          monthsWindow = this.value; // 'all' or '1'..'6'
-          refreshView();
-        });
-
-        document.getElementById("btnNotExp").addEventListener("click", function(){
-          currentMode = "NotExp";
-          refreshView();
-        });
-
-        document.getElementById("btnAll").addEventListener("click", function(){
-          currentMode = "ALL";
-          refreshView();
-        });
-
-        document.getElementById("btnReverse").addEventListener("click", function(){
-          reversed = !reversed;
-          refreshView();
-        });
-
+        document.getElementById("btnNotExp").addEventListener("click", showNotExpOnly);
+        document.getElementById("btnAll").addEventListener("click", showAllEntries);
         document.getElementById("btnReset").addEventListener("click", hardReload);
       },
       error: function(err){
