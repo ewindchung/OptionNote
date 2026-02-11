@@ -94,7 +94,7 @@
     .table-wrap{
       border:1px solid #ddd;
       border-radius: 10px;
-      overflow: visible;   /* IMPORTANT: FixedHeader works best with normal page scroll */
+      overflow: visible;
       background:#fff;
     }
 
@@ -114,7 +114,7 @@
       vertical-align: top;
     }
 
-    /* Row coloring (KeyContracts only, keep original) */
+    /* Row coloring (KeyContracts only) */
     tr.row-bull td{ background:#92D050 !important; color:#111 !important; }
     tr.row-bear td{ background:#FFC000 !important; color:#111 !important; }
     tr.row-grey td{ background:#e6e6e6 !important; color:#333 !important; }
@@ -141,7 +141,7 @@
       .tab{ font-size:14px; padding:8px 12px; }
     }
 
-    /* FixedHeader clone style tweak (so it matches) */
+    /* FixedHeader clone style tweak */
     table.dataTable.fixedHeader-floating thead th,
     table.dataTable.fixedHeader-locked thead th{
       background:#f6f6f6 !important;
@@ -166,7 +166,7 @@
     </div>
 
     <!-- ===================== -->
-    <!-- Panel: OpFlowKey (KEEP ORIGINAL LOGIC) -->
+    <!-- Panel: OpFlowKey -->
     <!-- ===================== -->
     <div class="panel active" id="panelKey">
       <div class="bar">
@@ -199,7 +199,7 @@
     </div>
 
     <!-- ===================== -->
-    <!-- Panel: OpFlowAgg (NEW) -->
+    <!-- Panel: OpFlowAgg -->
     <!-- ===================== -->
     <div class="panel" id="panelAgg">
       <div class="bar">
@@ -256,21 +256,15 @@
       const s0 = String(val).trim();
       if(!s0) return null;
 
-      // try Date(...) parse
       let d = new Date(s0);
       if(!isNaN(d)) return d;
 
-      // try M/D/YYYY
       const m = s0.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
       if(m){
-        const mm = parseInt(m[1],10);
-        const dd = parseInt(m[2],10);
-        const yy = parseInt(m[3],10);
-        d = new Date(yy, mm-1, dd);
+        d = new Date(parseInt(m[3],10), parseInt(m[1],10)-1, parseInt(m[2],10));
         if(!isNaN(d)) return d;
       }
 
-      // try YYYYMMDD
       const m2 = s0.match(/^(\d{4})(\d{2})(\d{2})$/);
       if(m2){
         d = new Date(parseInt(m2[1],10), parseInt(m2[2],10)-1, parseInt(m2[3],10));
@@ -291,7 +285,6 @@
     }
 
     function parseMoney(val){
-      // handles commas and parentheses negatives: (123,456.00)
       if(val == null) return null;
       const s = String(val).trim();
       if(!s) return null;
@@ -317,6 +310,20 @@
         `Rows: ${info.recordsDisplay.toLocaleString()} / ${info.recordsTotal.toLocaleString()}`;
     }
 
+    function setMeta(text){
+      document.getElementById("metaInfo").textContent = text;
+    }
+
+    function adjustDT(dt){
+      if(!dt) return;
+      try{
+        dt.columns.adjust();
+        if(dt.fixedHeader && typeof dt.fixedHeader.adjust === "function"){
+          dt.fixedHeader.adjust();
+        }
+      }catch(e){}
+    }
+
     // =========================
     // TAB handling
     // =========================
@@ -334,16 +341,28 @@
       panelAgg.classList.toggle("active", !isKey);
       activeCsvPill.textContent = isKey ? "latest.csv" : "latestAgg.csv";
 
-      // update row info pill for the active table
-      if(isKey) updateRowInfoFromDT(dtKey);
-      else updateRowInfoFromDT(dtAgg);
+      // IMPORTANT: Agg is lazy-init to avoid FixedHeader cloning wrong header while hidden
+      if(!isKey){
+        ensureAggInit();
+      }
+
+      // Let layout settle then adjust fixed header
+      setTimeout(() => {
+        if(isKey){
+          adjustDT(dtKey);
+          updateRowInfoFromDT(dtKey);
+        }else{
+          adjustDT(dtAgg);
+          updateRowInfoFromDT(dtAgg);
+        }
+      }, 50);
     }
 
     tabKey.addEventListener("click", () => activateTab("KEY"));
     tabAgg.addEventListener("click", () => activateTab("AGG"));
 
     // =========================
-    // OpFlowKey (YOUR ORIGINAL, unchanged except ids)
+    // OpFlowKey
     // =========================
     const BASE_CSV_KEY = "latest.csv";
     const DATE_COL_CANDIDATES_KEY = ["CreatedDate", "As.Date", "As Date", "As.Date.", "AsDate"];
@@ -351,7 +370,6 @@
     let dtKey = null;
     let headersKey = [];
     let allRowsKey = [];
-    let workingRowsKey = [];
     let isReversedKey = false;
     let dateColKey = null;
 
@@ -370,10 +388,6 @@
         th.textContent = h;
         hdr.appendChild(th);
       });
-    }
-
-    function setMeta(text){
-      document.getElementById("metaInfo").textContent = text;
     }
 
     function buildDataTableKey(data){
@@ -400,8 +414,6 @@
         order: [],
         deferRender: true,
         autoWidth: false,
-
-        // IMPORTANT: this is what makes header lock on PC + phone reliably
         fixedHeader: true,
 
         createdRow: function(row, dataArr){
@@ -409,7 +421,6 @@
           headersKey.forEach((h, i) => obj[h] = dataArr[i]);
 
           const flag = (obj["vecBullBearFlag"] || "").toString().trim().toUpperCase();
-
           const premRaw = obj["FinalNetPrem"];
           const prem = parseFloat(String(premRaw || "").replace(/,/g, "").trim());
           const premIsNum = !Number.isNaN(prem);
@@ -424,8 +435,6 @@
 
         initComplete: function(){
           const api = this.api();
-
-          // per-column filters
           api.columns().every(function(){
             const col = this;
             const th = $(col.header());
@@ -441,11 +450,13 @@
           });
 
           updateRowInfoFromDT(dtKey);
+          adjustDT(dtKey);
         }
       });
 
       dtKey.on("draw", function(){ updateRowInfoFromDT(dtKey); });
       updateRowInfoFromDT(dtKey);
+      adjustDT(dtKey);
     }
 
     function applyRangeAndReverseKey(){
@@ -463,8 +474,7 @@
 
       if(isReversedKey) rows.reverse();
 
-      workingRowsKey = rows;
-      buildDataTableKey(workingRowsKey);
+      buildDataTableKey(rows);
 
       const rangeText = (sel === "all") ? "ALL" : `Latest ${sel} month(s)`;
       const revText = isReversedKey ? "Reversed" : "Normal";
@@ -473,7 +483,7 @@
     }
 
     // =========================
-    // OpFlowAgg (NEW)
+    // OpFlowAgg (LAZY INIT)
     // =========================
     const BASE_CSV_AGG = "latestAgg.csv";
     const DATE_COL_CANDIDATES_AGG = ["CreateDate", "CreatedDate", "As.Date", "As Date", "Date", "Created"];
@@ -481,9 +491,11 @@
     let dtAgg = null;
     let headersAgg = [];
     let allRowsAgg = [];
-    let workingRowsAgg = [];
     let isReversedAgg = false;
     let dateColAgg = null;
+
+    let aggLoaded = false;
+    let aggInitDone = false;
 
     function detectDateColAgg(){
       for(const c of DATE_COL_CANDIDATES_AGG){
@@ -526,18 +538,13 @@
         order: [],
         deferRender: true,
         autoWidth: false,
-
         fixedHeader: true,
 
         createdRow: function(row, dataArr){
-          // Per-cell coloring: >=1,000,000 green, <=-1,000,000 orange
-          // Apply to ALL numeric cells except maybe the first few ID cols; safest: scan all cells.
           const tds = row.querySelectorAll("td");
           for(let i=0;i<tds.length;i++){
-            const v = dataArr[i];
-            const n = parseMoney(v);
+            const n = parseMoney(dataArr[i]);
             if(n == null) continue;
-
             if(n >= 1000000) tds[i].classList.add("cell-pos");
             else if(n <= -1000000) tds[i].classList.add("cell-neg");
           }
@@ -545,8 +552,6 @@
 
         initComplete: function(){
           const api = this.api();
-
-          // per-column filters
           api.columns().every(function(){
             const col = this;
             const th = $(col.header());
@@ -562,11 +567,13 @@
           });
 
           updateRowInfoFromDT(dtAgg);
+          adjustDT(dtAgg);
         }
       });
 
       dtAgg.on("draw", function(){ updateRowInfoFromDT(dtAgg); });
       updateRowInfoFromDT(dtAgg);
+      adjustDT(dtAgg);
     }
 
     function rangeAggToCutoff(sel){
@@ -596,8 +603,7 @@
 
       if(isReversedAgg) rows.reverse();
 
-      workingRowsAgg = rows;
-      buildDataTableAgg(workingRowsAgg);
+      buildDataTableAgg(rows);
 
       const rangeText = (sel === "all") ? "ALL" : `Latest ${sel}`;
       const revText = isReversedAgg ? "Reversed" : "Normal";
@@ -605,8 +611,31 @@
       setMeta(`OpFlowAgg | ${rangeText} | ${revText} | ${dateText}`);
     }
 
+    function ensureAggInit(){
+      if(aggInitDone) return;
+      if(!aggLoaded){
+        setMeta("OpFlowAgg not loaded yet...");
+        return;
+      }
+      // Panel is visible now -> safe to init DataTable with FixedHeader
+      buildHeaderAgg();
+      applyRangeAndReverseAgg();
+
+      document.getElementById("selRangeAgg").addEventListener("change", applyRangeAndReverseAgg);
+
+      document.getElementById("btnReverseAgg").addEventListener("click", function(){
+        isReversedAgg = !isReversedAgg;
+        applyRangeAndReverseAgg();
+      });
+
+      document.getElementById("btnResetAgg").addEventListener("click", hardReload);
+
+      aggInitDone = true;
+      setTimeout(() => adjustDT(dtAgg), 50);
+    }
+
     // =========================
-    // Load both CSVs
+    // CSV loader
     // =========================
     function loadCsv(url, onOk, onFail){
       Papa.parse(url, {
@@ -614,16 +643,12 @@
         header: true,
         dynamicTyping: false,
         skipEmptyLines: true,
-        complete: function(results){
-          onOk(results);
-        },
-        error: function(err){
-          onFail(err);
-        }
+        complete: function(results){ onOk(results); },
+        error: function(err){ onFail(err); }
       });
     }
 
-    // Load Key
+    // Load Key (init immediately, visible)
     const csvUrlKey = `${BASE_CSV_KEY}?v=${Date.now()}`;
     loadCsv(csvUrlKey,
       function(results){
@@ -643,7 +668,6 @@
 
         document.getElementById("btnResetKey").addEventListener("click", hardReload);
 
-        // default tab already key
         activateTab("KEY");
       },
       function(err){
@@ -653,30 +677,19 @@
       }
     );
 
-    // Load Agg
+    // Load Agg (ONLY load data; init later when tab shown)
     const csvUrlAgg = `${BASE_CSV_AGG}?v=${Date.now()}`;
     loadCsv(csvUrlAgg,
       function(results){
         allRowsAgg = results.data || [];
         headersAgg = results.meta.fields || [];
         dateColAgg = detectDateColAgg();
-
-        buildHeaderAgg();
-        applyRangeAndReverseAgg();
-
-        document.getElementById("selRangeAgg").addEventListener("change", applyRangeAndReverseAgg);
-
-        document.getElementById("btnReverseAgg").addEventListener("click", function(){
-          isReversedAgg = !isReversedAgg;
-          applyRangeAndReverseAgg();
-        });
-
-        document.getElementById("btnResetAgg").addEventListener("click", hardReload);
+        aggLoaded = true;
+        // do NOT init dtAgg here (panel hidden) -> lazy init
       },
       function(err){
         console.error(err);
-        // Don't block the whole page if Agg missing; just show a message in meta
-        // If user clicks Agg tab, they'll see empty table.
+        aggLoaded = false;
         setMeta("OpFlowAgg load failed (latestAgg.csv missing?)");
       }
     );
