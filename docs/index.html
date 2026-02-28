@@ -250,6 +250,10 @@
       url.searchParams.set("v", Date.now().toString());
       window.location.replace(url.toString());
     }
+function escapeRegex(s){
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 
     function parseDate(val){
       if(val == null) return null;
@@ -433,25 +437,43 @@
           if(flag === "BEAR") row.classList.add("row-bear");
         },
 
-        initComplete: function(){
-          const api = this.api();
-          api.columns().every(function(){
-            const col = this;
-            const th = $(col.header());
-            th.find("input.col-filter").remove();
+ initComplete: function(){
+  const api = this.api();
 
-            $('<input class="col-filter" type="text" placeholder="filter...">')
-              .appendTo(th)
-              .on("keyup change clear", function(){
-                if(col.search() !== this.value){
-                  col.search(this.value).draw();
-                }
-              });
-          });
+  api.columns().every(function(){
+    const col = this;
+    const thEl = col.header();
+    const colName = (thEl.textContent || "").trim();
 
-          updateRowInfoFromDT(dtKey);
-          adjustDT(dtKey);
+    const isTickerCol = (colName.toLowerCase() === "symbol");
+
+    const th = $(thEl);
+    th.find("input.col-filter").remove();
+
+    $('<input class="col-filter" type="text" placeholder="filter...">')
+      .appendTo(th)
+      .on("keyup change clear", function(){
+        const v = (this.value || "").trim();
+
+        if(isTickerCol){
+          if(v === ""){
+            col.search("", false, true).draw(); // clear
+          }else{
+            col.search("^" + escapeRegex(v) + "$", true, false).draw(); // exact, case-insensitive
+          }
+        }else{
+          // other columns keep original contains search
+          if(col.search() !== v){
+            col.search(v).draw();
+          }
         }
+      });
+  });
+
+  updateRowInfoFromDT(dtKey);
+  adjustDT(dtKey);
+}
+
       });
 
       dtKey.on("draw", function(){ updateRowInfoFromDT(dtKey); });
@@ -550,25 +572,42 @@
           }
         },
 
-        initComplete: function(){
-          const api = this.api();
-          api.columns().every(function(){
-            const col = this;
-            const th = $(col.header());
-            th.find("input.col-filter").remove();
+initComplete: function(){
+  const api = this.api();
 
-            $('<input class="col-filter" type="text" placeholder="filter...">')
-              .appendTo(th)
-              .on("keyup change clear", function(){
-                if(col.search() !== this.value){
-                  col.search(this.value).draw();
-                }
-              });
-          });
+  api.columns().every(function(){
+    const col = this;
+    const thEl = col.header();
+    const colName = (thEl.textContent || "").trim();
 
-          updateRowInfoFromDT(dtAgg);
-          adjustDT(dtAgg);
+    const isTickerCol = (colName.toLowerCase() === "tickers");
+
+    const th = $(thEl);
+    th.find("input.col-filter").remove();
+
+    $('<input class="col-filter" type="text" placeholder="filter...">')
+      .appendTo(th)
+      .on("keyup change clear", function(){
+        const v = (this.value || "").trim();
+
+        if(isTickerCol){
+          if(v === ""){
+            col.search("", false, true).draw(); // clear
+          }else{
+            col.search("^" + escapeRegex(v) + "$", true, false).draw(); // exact, case-insensitive
+          }
+        }else{
+          // other columns keep original contains search
+          if(col.search() !== v){
+            col.search(v).draw();
+          }
         }
+      });
+  });
+
+  updateRowInfoFromDT(dtKey);
+  adjustDT(dtKey);
+}
       });
 
       dtAgg.on("draw", function(){ updateRowInfoFromDT(dtAgg); });
