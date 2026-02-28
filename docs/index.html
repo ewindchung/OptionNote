@@ -7,7 +7,7 @@
 
   <!-- DataTables -->
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css"/>
-  <!-- FixedHeader (IMPORTANT) -->
+  <!-- FixedHeader -->
   <link rel="stylesheet" href="https://cdn.datatables.net/fixedheader/3.4.0/css/fixedHeader.dataTables.min.css"/>
 
   <style>
@@ -24,7 +24,6 @@
       padding: 16px 12px 20px;
     }
     h1{ margin:0 0 8px; font-size:20px; font-weight:700; }
-    .sub{ margin:0 0 10px; font-size:13px; color:#444; }
 
     /* Tabs */
     .tabs{
@@ -90,6 +89,15 @@
     }
     .spacer{ flex:1; }
 
+    .searchSym{
+      border:1px solid #ccc;
+      background:#fff;
+      padding:7px 10px;
+      border-radius:8px;
+      font-size: 13px;
+      min-width: 180px;
+    }
+
     /* Table container */
     .table-wrap{
       border:1px solid #ddd;
@@ -136,6 +144,7 @@
 
     @media (max-width: 768px){
       .btn, .select{ font-size:14px; padding:8px 10px; }
+      .searchSym{ font-size:14px; padding:8px 10px; min-width: 140px; }
       .col-filter{ font-size: 14px; padding: 6px 8px; }
       table.dataTable{ font-size: 12px; }
       .tab{ font-size:14px; padding:8px 12px; }
@@ -185,7 +194,11 @@
         <button class="btn" id="btnResetKey">Reset (reload)</button>
 
         <div class="spacer"></div>
-        <span class="pill">Use search box / column filters</span>
+
+        <span class="pill">searchSym (exact)</span>
+        <input id="searchSymKey" class="searchSym" type="text" placeholder="e.g. AAPL (exact)"/>
+
+        <span class="pill">Use column filters / Search (exact)</span>
       </div>
 
       <div class="table-wrap">
@@ -220,6 +233,10 @@
         <button class="btn" id="btnResetAgg">Reset (reload)</button>
 
         <div class="spacer"></div>
+
+        <span class="pill">searchSym (exact)</span>
+        <input id="searchSymAgg" class="searchSym" type="text" placeholder="e.g. AAPL (exact)"/>
+
         <span class="pill">Cells >= 1,000,000 green | <= -1,000,000 orange</span>
       </div>
 
@@ -250,10 +267,49 @@
       url.searchParams.set("v", Date.now().toString());
       window.location.replace(url.toString());
     }
-function escapeRegex(s){
-  return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
 
+    function escapeRegex(s){
+      return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }
+
+    // DataTables "smart" search OFF + use regex; case-insensitive is controlled by DataTables (default true)
+    function exactRegexFromInput(v){
+      const t = (v || "").trim();
+      if(!t) return "";
+      return "^" + escapeRegex(t) + "$";
+    }
+
+    // Make the global Search box exact match too (case-insensitive)
+    // DataTables global search runs across all columns; we do exact match against the full row string.
+    // So we implement it as an exact "contains-only" by forcing smart=false + regex=true,
+    // but exact row match is not practical. Instead, we set the global search to exact match
+    // on the Ticker/Symbol column only by overriding DataTables search input event.
+    function wireGlobalSearchExactTicker(dt, tickerColIdx){
+      const wrapper = dt.table().container();
+      const input = wrapper.querySelector('div.dataTables_filter input[type="search"]');
+      if(!input) return;
+
+      // Remove default handler by cloning node (simple + reliable)
+      const input2 = input.cloneNode(true);
+      input.parentNode.replaceChild(input2, input);
+
+      input2.addEventListener("input", function(){
+        const v = (this.value || "").trim();
+        if(tickerColIdx == null || tickerColIdx < 0){
+          // fallback: normal global contains (but still case-insensitive)
+          dt.search(v, false, true).draw();
+          return;
+        }
+        if(v === ""){
+          dt.columns().search("");
+          dt.search("").draw();
+          return;
+        }
+        // exact match ONLY on ticker column (case-insensitive)
+        dt.columns().search("");
+        dt.column(tickerColIdx).search(exactRegexFromInput(v), true, false).draw();
+      });
+    }
 
     function parseDate(val){
       if(val == null) return null;
@@ -350,7 +406,6 @@ function escapeRegex(s){
         ensureAggInit();
       }
 
-      // Let layout settle then adjust fixed header
       setTimeout(() => {
         if(isKey){
           adjustDT(dtKey);
@@ -377,6 +432,9 @@ function escapeRegex(s){
     let isReversedKey = false;
     let dateColKey = null;
 
+    // for searchSym + global exact search
+    let keySymbolColIdx = -1;
+
     function detectDateColKey(){
       for(const c of DATE_COL_CANDIDATES_KEY){
         if(headersKey.includes(c)) return c;
@@ -392,6 +450,7 @@ function escapeRegex(s){
         th.textContent = h;
         hdr.appendChild(th);
       });
+      keySymbolColIdx = headersKey.findIndex(h => String(h).trim().toLowerCase() === "symbol");
     }
 
     function buildDataTableKey(data){
@@ -420,6 +479,9 @@ function escapeRegex(s){
         autoWidth: false,
         fixedHeader: true,
 
+        // IMPORTANT: make DataTables regex searches NOT "smart"
+        search: { smart: false },
+
         createdRow: function(row, dataArr){
           const obj = {};
           headersKey.forEach((h, i) => obj[h] = dataArr[i]);
@@ -437,43 +499,62 @@ function escapeRegex(s){
           if(flag === "BEAR") row.classList.add("row-bear");
         },
 
- initComplete: function(){
-  const api = this.api();
+        initComplete: function(){
+          const api = this.api();
 
-  api.columns().every(function(){
-    const col = this;
-    const thEl = col.header();
-    const colName = (thEl.textContent || "").trim();
+          // per-column filters (Symbol exact; others contains)
+          api.columns().every(function(){
+            const col = this;
+            const thEl = col.header();
+            const colName = (thEl.textContent || "").trim();
+            const isTickerCol = (colName.toLowerCase() === "symbol");
 
-    const isTickerCol = (colName.toLowerCase() === "symbol");
+            const th = $(thEl);
+            th.find("input.col-filter").remove();
 
-    const th = $(thEl);
-    th.find("input.col-filter").remove();
+            $('<input class="col-filter" type="text" placeholder="filter...">')
+              .appendTo(th)
+              .on("keyup change clear", function(){
+                const v = (this.value || "").trim();
 
-    $('<input class="col-filter" type="text" placeholder="filter...">')
-      .appendTo(th)
-      .on("keyup change clear", function(){
-        const v = (this.value || "").trim();
+                if(isTickerCol){
+                  if(v === ""){
+                    col.search("", false, true).draw();
+                  }else{
+                    col.search(exactRegexFromInput(v), true, false).draw(); // regex exact, case-insensitive
+                  }
+                }else{
+                  if(col.search() !== v){
+                    col.search(v, false, true).draw(); // contains
+                  }
+                }
+              });
+          });
 
-        if(isTickerCol){
-          if(v === ""){
-            col.search("", false, true).draw(); // clear
-          }else{
-            col.search("^" + escapeRegex(v) + "$", true, false).draw(); // exact, case-insensitive
+          // searchSym exact ticker
+          const symInput = document.getElementById("searchSymKey");
+          if(symInput){
+            symInput.addEventListener("input", function(){
+              const v = (this.value || "").trim();
+              if(keySymbolColIdx < 0) return;
+
+              // clear all filters then apply only symbol exact
+              api.columns().search("");
+              api.search(""); // clear global
+              if(v === ""){
+                api.draw();
+              }else{
+                api.column(keySymbolColIdx).search(exactRegexFromInput(v), true, false).draw();
+              }
+            });
           }
-        }else{
-          // other columns keep original contains search
-          if(col.search() !== v){
-            col.search(v).draw();
-          }
+
+          // Global Search box -> exact match on Symbol column too
+          wireGlobalSearchExactTicker(api, keySymbolColIdx);
+
+          updateRowInfoFromDT(dtKey);
+          adjustDT(dtKey);
         }
-      });
-  });
-
-  updateRowInfoFromDT(dtKey);
-  adjustDT(dtKey);
-}
-
       });
 
       dtKey.on("draw", function(){ updateRowInfoFromDT(dtKey); });
@@ -519,6 +600,9 @@ function escapeRegex(s){
     let aggLoaded = false;
     let aggInitDone = false;
 
+    // for searchSym + global exact search
+    let aggTickerColIdx = -1;
+
     function detectDateColAgg(){
       for(const c of DATE_COL_CANDIDATES_AGG){
         if(headersAgg.includes(c)) return c;
@@ -534,6 +618,7 @@ function escapeRegex(s){
         th.textContent = h;
         hdr.appendChild(th);
       });
+      aggTickerColIdx = headersAgg.findIndex(h => String(h).trim().toLowerCase() === "tickers");
     }
 
     function buildDataTableAgg(data){
@@ -562,6 +647,8 @@ function escapeRegex(s){
         autoWidth: false,
         fixedHeader: true,
 
+        search: { smart: false },
+
         createdRow: function(row, dataArr){
           const tds = row.querySelectorAll("td");
           for(let i=0;i<tds.length;i++){
@@ -572,42 +659,61 @@ function escapeRegex(s){
           }
         },
 
-initComplete: function(){
-  const api = this.api();
+        initComplete: function(){
+          const api = this.api();
 
-  api.columns().every(function(){
-    const col = this;
-    const thEl = col.header();
-    const colName = (thEl.textContent || "").trim();
+          // per-column filters (Tickers exact; others contains)
+          api.columns().every(function(){
+            const col = this;
+            const thEl = col.header();
+            const colName = (thEl.textContent || "").trim();
+            const isTickerCol = (colName.toLowerCase() === "tickers");
 
-    const isTickerCol = (colName.toLowerCase() === "tickers");
+            const th = $(thEl);
+            th.find("input.col-filter").remove();
 
-    const th = $(thEl);
-    th.find("input.col-filter").remove();
+            $('<input class="col-filter" type="text" placeholder="filter...">')
+              .appendTo(th)
+              .on("keyup change clear", function(){
+                const v = (this.value || "").trim();
 
-    $('<input class="col-filter" type="text" placeholder="filter...">')
-      .appendTo(th)
-      .on("keyup change clear", function(){
-        const v = (this.value || "").trim();
+                if(isTickerCol){
+                  if(v === ""){
+                    col.search("", false, true).draw();
+                  }else{
+                    col.search(exactRegexFromInput(v), true, false).draw();
+                  }
+                }else{
+                  if(col.search() !== v){
+                    col.search(v, false, true).draw();
+                  }
+                }
+              });
+          });
 
-        if(isTickerCol){
-          if(v === ""){
-            col.search("", false, true).draw(); // clear
-          }else{
-            col.search("^" + escapeRegex(v) + "$", true, false).draw(); // exact, case-insensitive
+          // searchSym exact ticker
+          const symInput = document.getElementById("searchSymAgg");
+          if(symInput){
+            symInput.addEventListener("input", function(){
+              const v = (this.value || "").trim();
+              if(aggTickerColIdx < 0) return;
+
+              api.columns().search("");
+              api.search("");
+              if(v === ""){
+                api.draw();
+              }else{
+                api.column(aggTickerColIdx).search(exactRegexFromInput(v), true, false).draw();
+              }
+            });
           }
-        }else{
-          // other columns keep original contains search
-          if(col.search() !== v){
-            col.search(v).draw();
-          }
+
+          // Global Search box -> exact match on Tickers column too
+          wireGlobalSearchExactTicker(api, aggTickerColIdx);
+
+          updateRowInfoFromDT(dtAgg);
+          adjustDT(dtAgg);
         }
-      });
-  });
-
-  updateRowInfoFromDT(dtKey);
-  adjustDT(dtKey);
-}
       });
 
       dtAgg.on("draw", function(){ updateRowInfoFromDT(dtAgg); });
@@ -656,7 +762,6 @@ initComplete: function(){
         setMeta("OpFlowAgg not loaded yet...");
         return;
       }
-      // Panel is visible now -> safe to init DataTable with FixedHeader
       buildHeaderAgg();
       applyRangeAndReverseAgg();
 
@@ -724,7 +829,6 @@ initComplete: function(){
         headersAgg = results.meta.fields || [];
         dateColAgg = detectDateColAgg();
         aggLoaded = true;
-        // do NOT init dtAgg here (panel hidden) -> lazy init
       },
       function(err){
         console.error(err);
