@@ -25,7 +25,6 @@
     }
     h1{ margin:0 0 8px; font-size:20px; font-weight:700; }
 
-    /* Tabs */
     .tabs{
       display:flex;
       gap:8px;
@@ -98,7 +97,6 @@
       min-width: 180px;
     }
 
-    /* Table container */
     .table-wrap{
       border:1px solid #ddd;
       border-radius: 10px;
@@ -113,7 +111,6 @@
       width:100% !important;
     }
 
-    /* Header look */
     table.dataTable thead th{
       background:#f6f6f6 !important;
       color:#111 !important;
@@ -122,12 +119,12 @@
       vertical-align: top;
     }
 
-    /* Row coloring (KeyContracts only) */
+    /* OpFlowKey + KeyContractOI row coloring */
     tr.row-bull td{ background:#92D050 !important; color:#111 !important; }
     tr.row-bear td{ background:#FFC000 !important; color:#111 !important; }
     tr.row-grey td{ background:#e6e6e6 !important; color:#333 !important; }
 
-    /* Cell coloring (Agg) */
+    /* OpFlowAgg cell coloring */
     td.cell-pos{ background:#92D050 !important; color:#111 !important; }
     td.cell-neg{ background:#FFC000 !important; color:#111 !important; }
 
@@ -150,13 +147,11 @@
       .tab{ font-size:14px; padding:8px 12px; }
     }
 
-    /* FixedHeader clone style tweak */
     table.dataTable.fixedHeader-floating thead th,
     table.dataTable.fixedHeader-locked thead th{
       background:#f6f6f6 !important;
     }
 
-    /* Panels */
     .panel{ display:none; }
     .panel.active{ display:block; }
   </style>
@@ -169,14 +164,13 @@
     <div class="tabs">
       <div class="tab active" id="tabKey">OpFlowKey</div>
       <div class="tab" id="tabAgg">OpFlowAgg</div>
+      <div class="tab" id="tabOI">KeyContractOI</div>
       <span class="pill" id="activeCsvPill">latest.csv</span>
       <span id="rowInfo" class="pill">Loading…</span>
       <span id="metaInfo" class="pill">—</span>
     </div>
 
-    <!-- ===================== -->
-    <!-- Panel: OpFlowKey -->
-    <!-- ===================== -->
+    <!-- OpFlowKey -->
     <div class="panel active" id="panelKey">
       <div class="bar">
         <label class="pill">Range</label>
@@ -194,26 +188,20 @@
         <button class="btn" id="btnResetKey">Reset (reload)</button>
 
         <div class="spacer"></div>
-
         <span class="pill">searchSym (exact)</span>
         <input id="searchSymKey" class="searchSym" type="text" placeholder="e.g. AAPL (exact)"/>
-
         <span class="pill">Use column filters / Search (exact)</span>
       </div>
 
       <div class="table-wrap">
         <table id="tblKey" class="display hover" style="width:100%">
-          <thead>
-            <tr id="hdrRowKey"></tr>
-          </thead>
+          <thead><tr id="hdrRowKey"></tr></thead>
           <tbody></tbody>
         </table>
       </div>
     </div>
 
-    <!-- ===================== -->
-    <!-- Panel: OpFlowAgg -->
-    <!-- ===================== -->
+    <!-- OpFlowAgg -->
     <div class="panel" id="panelAgg">
       <div class="bar">
         <label class="pill">Range</label>
@@ -233,18 +221,45 @@
         <button class="btn" id="btnResetAgg">Reset (reload)</button>
 
         <div class="spacer"></div>
-
         <span class="pill">searchSym (exact)</span>
         <input id="searchSymAgg" class="searchSym" type="text" placeholder="e.g. AAPL (exact)"/>
-
-        <span class="pill">Cells >= 1,000,000 green | <= -1,000,000 orange</span>
+        <span class="pill">Cells &gt;= 1,000,000 green | &lt;= -1,000,000 orange</span>
       </div>
 
       <div class="table-wrap">
         <table id="tblAgg" class="display hover" style="width:100%">
-          <thead>
-            <tr id="hdrRowAgg"></tr>
-          </thead>
+          <thead><tr id="hdrRowAgg"></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- KeyContractOI -->
+    <div class="panel" id="panelOI">
+      <div class="bar">
+        <label class="pill">Range</label>
+        <select id="selRangeOI" class="select">
+          <option value="all" selected>ALL</option>
+          <option value="1">Latest 1 month</option>
+          <option value="2">Latest 2 months</option>
+          <option value="3">Latest 3 months</option>
+          <option value="4">Latest 4 months</option>
+          <option value="5">Latest 5 months</option>
+          <option value="6">Latest 6 months</option>
+        </select>
+
+        <button class="btn" id="btnReverseOI">Reverse rows</button>
+        <button class="btn" id="btnResetOI">Reset (reload)</button>
+
+        <div class="spacer"></div>
+        <span class="pill">searchSym (exact)</span>
+        <input id="searchSymOI" class="searchSym" type="text" placeholder="e.g. AAPL (exact)"/>
+        <span class="pill">Use column filters / Search (exact)</span>
+      </div>
+
+      <div class="table-wrap">
+        <table id="tblOI" class="display hover" style="width:100%">
+          <thead><tr id="hdrRowOI"></tr></thead>
           <tbody></tbody>
         </table>
       </div>
@@ -252,7 +267,6 @@
 
   </div>
 
-  <!-- jQuery + DataTables + FixedHeader + PapaParse -->
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
   <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
   <script src="https://cdn.datatables.net/fixedheader/3.4.0/js/dataTables.fixedHeader.min.js"></script>
@@ -272,31 +286,23 @@
       return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     }
 
-    // DataTables "smart" search OFF + use regex; case-insensitive is controlled by DataTables (default true)
     function exactRegexFromInput(v){
       const t = (v || "").trim();
       if(!t) return "";
       return "^" + escapeRegex(t) + "$";
     }
 
-    // Make the global Search box exact match too (case-insensitive)
-    // DataTables global search runs across all columns; we do exact match against the full row string.
-    // So we implement it as an exact "contains-only" by forcing smart=false + regex=true,
-    // but exact row match is not practical. Instead, we set the global search to exact match
-    // on the Ticker/Symbol column only by overriding DataTables search input event.
     function wireGlobalSearchExactTicker(dt, tickerColIdx){
       const wrapper = dt.table().container();
       const input = wrapper.querySelector('div.dataTables_filter input[type="search"]');
       if(!input) return;
 
-      // Remove default handler by cloning node (simple + reliable)
       const input2 = input.cloneNode(true);
       input.parentNode.replaceChild(input2, input);
 
       input2.addEventListener("input", function(){
         const v = (this.value || "").trim();
         if(tickerColIdx == null || tickerColIdx < 0){
-          // fallback: normal global contains (but still case-insensitive)
           dt.search(v, false, true).draw();
           return;
         }
@@ -305,7 +311,6 @@
           dt.search("").draw();
           return;
         }
-        // exact match ONLY on ticker column (case-insensitive)
         dt.columns().search("");
         dt.column(tickerColIdx).search(exactRegexFromInput(v), true, false).draw();
       });
@@ -330,7 +335,6 @@
         d = new Date(parseInt(m2[1],10), parseInt(m2[2],10)-1, parseInt(m2[3],10));
         if(!isNaN(d)) return d;
       }
-
       return null;
     }
 
@@ -348,15 +352,12 @@
       if(val == null) return null;
       const s = String(val).trim();
       if(!s) return null;
-
       let neg = false;
       let t = s;
-
       if(t.startsWith("(") && t.endsWith(")")){
         neg = true;
         t = t.slice(1, -1);
       }
-
       t = t.replace(/,/g, "").trim();
       const n = parseFloat(t);
       if(Number.isNaN(n)) return null;
@@ -384,271 +385,183 @@
       }catch(e){}
     }
 
+    function addColumnFilters(api, headers, tickerNames){
+      api.columns().every(function(){
+        const col = this;
+        const idx = col.index();
+        const colName = String(headers[idx] || "").trim();
+        const isTickerCol = tickerNames.includes(colName.toLowerCase());
+        const th = $(col.header());
+        th.find("input.col-filter").remove();
+
+        $('<input class="col-filter" type="text" placeholder="filter...">')
+          .appendTo(th)
+          .on("keyup change clear", function(){
+            const v = (this.value || "").trim();
+            if(isTickerCol){
+              if(v === "") col.search("", false, true).draw();
+              else col.search(exactRegexFromInput(v), true, false).draw();
+            }else{
+              if(col.search() !== v) col.search(v, false, true).draw();
+            }
+          });
+      });
+    }
+
+    function wireSearchSym(inputId, api, tickerColIdx){
+      const input = document.getElementById(inputId);
+      if(!input || tickerColIdx < 0) return;
+      input.oninput = function(){
+        const v = (this.value || "").trim();
+        api.columns().search("");
+        api.search("");
+        if(v === "") api.draw();
+        else api.column(tickerColIdx).search(exactRegexFromInput(v), true, false).draw();
+      };
+    }
+
     // =========================
-    // TAB handling
+    // Tabs
     // =========================
     const tabKey = document.getElementById("tabKey");
     const tabAgg = document.getElementById("tabAgg");
+    const tabOI = document.getElementById("tabOI");
     const panelKey = document.getElementById("panelKey");
     const panelAgg = document.getElementById("panelAgg");
+    const panelOI = document.getElementById("panelOI");
     const activeCsvPill = document.getElementById("activeCsvPill");
 
     function activateTab(which){
-      const isKey = (which === "KEY");
-      tabKey.classList.toggle("active", isKey);
-      tabAgg.classList.toggle("active", !isKey);
-      panelKey.classList.toggle("active", isKey);
-      panelAgg.classList.toggle("active", !isKey);
-      activeCsvPill.textContent = isKey ? "latest.csv" : "latestAgg.csv";
+      const isKey = which === "KEY";
+      const isAgg = which === "AGG";
+      const isOI  = which === "OI";
 
-      // IMPORTANT: Agg is lazy-init to avoid FixedHeader cloning wrong header while hidden
-      if(!isKey){
-        ensureAggInit();
-      }
+      tabKey.classList.toggle("active", isKey);
+      tabAgg.classList.toggle("active", isAgg);
+      tabOI.classList.toggle("active", isOI);
+
+      panelKey.classList.toggle("active", isKey);
+      panelAgg.classList.toggle("active", isAgg);
+      panelOI.classList.toggle("active", isOI);
+
+      activeCsvPill.textContent = isKey ? "latest.csv" : (isAgg ? "latestAgg.csv" : "latestOI.csv");
+
+      if(isAgg) ensureAggInit();
+      if(isOI) ensureOIInit();
 
       setTimeout(() => {
-        if(isKey){
-          adjustDT(dtKey);
-          updateRowInfoFromDT(dtKey);
-        }else{
-          adjustDT(dtAgg);
-          updateRowInfoFromDT(dtAgg);
-        }
+        if(isKey){ adjustDT(dtKey); updateRowInfoFromDT(dtKey); }
+        if(isAgg){ adjustDT(dtAgg); updateRowInfoFromDT(dtAgg); }
+        if(isOI){ adjustDT(dtOI); updateRowInfoFromDT(dtOI); }
       }, 50);
     }
 
     tabKey.addEventListener("click", () => activateTab("KEY"));
     tabAgg.addEventListener("click", () => activateTab("AGG"));
+    tabOI.addEventListener("click", () => activateTab("OI"));
 
     // =========================
     // OpFlowKey
     // =========================
     const BASE_CSV_KEY = "latest.csv";
     const DATE_COL_CANDIDATES_KEY = ["CreatedDate", "As.Date", "As Date", "As.Date.", "AsDate"];
-
-    let dtKey = null;
-    let headersKey = [];
-    let allRowsKey = [];
-    let isReversedKey = false;
-    let dateColKey = null;
-
-    // for searchSym + global exact search
+    let dtKey = null, headersKey = [], allRowsKey = [], isReversedKey = false, dateColKey = null;
     let keySymbolColIdx = -1;
 
     function detectDateColKey(){
-      for(const c of DATE_COL_CANDIDATES_KEY){
-        if(headersKey.includes(c)) return c;
-      }
+      for(const c of DATE_COL_CANDIDATES_KEY) if(headersKey.includes(c)) return c;
       return null;
     }
 
     function buildHeaderKey(){
       const hdr = document.getElementById("hdrRowKey");
       hdr.innerHTML = "";
-      headersKey.forEach(h => {
-        const th = document.createElement("th");
-        th.textContent = h;
-        hdr.appendChild(th);
-      });
+      headersKey.forEach(h => { const th = document.createElement("th"); th.textContent = h; hdr.appendChild(th); });
       keySymbolColIdx = headersKey.findIndex(h => String(h).trim().toLowerCase() === "symbol");
     }
 
     function buildDataTableKey(data){
-      if(dtKey){
-        dtKey.destroy();
-        $("#tblKey tbody").empty();
-      }
-
+      if(dtKey){ dtKey.destroy(); $("#tblKey tbody").empty(); }
       const tbody = document.querySelector("#tblKey tbody");
       tbody.innerHTML = "";
       data.forEach(row => {
         const tr = document.createElement("tr");
-        headersKey.forEach(h => {
-          const td = document.createElement("td");
-          td.textContent = row[h] ?? "";
-          tr.appendChild(td);
-        });
+        headersKey.forEach(h => { const td = document.createElement("td"); td.textContent = row[h] ?? ""; tr.appendChild(td); });
         tbody.appendChild(tr);
       });
 
       dtKey = $("#tblKey").DataTable({
         pageLength: -1,
         lengthMenu: [[25,50,100,250,500,-1],[25,50,100,250,500,"All"]],
-        order: [],
-        deferRender: true,
-        autoWidth: false,
-        fixedHeader: true,
-
-        // IMPORTANT: make DataTables regex searches NOT "smart"
+        order: [], deferRender: true, autoWidth: false, fixedHeader: true,
         search: { smart: false },
-
         createdRow: function(row, dataArr){
-          const obj = {};
-          headersKey.forEach((h, i) => obj[h] = dataArr[i]);
-
+          const obj = {}; headersKey.forEach((h,i) => obj[h] = dataArr[i]);
           const flag = (obj["vecBullBearFlag"] || "").toString().trim().toUpperCase();
-          const premRaw = obj["FinalNetPrem"];
-          const prem = parseFloat(String(premRaw || "").replace(/,/g, "").trim());
-          const premIsNum = !Number.isNaN(prem);
-
-          if(premIsNum && prem <= 0){
-            row.classList.add("row-grey");
-            return;
-          }
+          const prem = parseFloat(String(obj["FinalNetPrem"] || "").replace(/,/g, "").trim());
+          if(!Number.isNaN(prem) && prem <= 0){ row.classList.add("row-grey"); return; }
           if(flag === "BULL") row.classList.add("row-bull");
           if(flag === "BEAR") row.classList.add("row-bear");
         },
-
         initComplete: function(){
           const api = this.api();
-
-          // per-column filters (Symbol exact; others contains)
-          api.columns().every(function(){
-            const col = this;
-            const thEl = col.header();
-            const colName = (thEl.textContent || "").trim();
-            const isTickerCol = (colName.toLowerCase() === "symbol");
-
-            const th = $(thEl);
-            th.find("input.col-filter").remove();
-
-            $('<input class="col-filter" type="text" placeholder="filter...">')
-              .appendTo(th)
-              .on("keyup change clear", function(){
-                const v = (this.value || "").trim();
-
-                if(isTickerCol){
-                  if(v === ""){
-                    col.search("", false, true).draw();
-                  }else{
-                    col.search(exactRegexFromInput(v), true, false).draw(); // regex exact, case-insensitive
-                  }
-                }else{
-                  if(col.search() !== v){
-                    col.search(v, false, true).draw(); // contains
-                  }
-                }
-              });
-          });
-
-          // searchSym exact ticker
-          const symInput = document.getElementById("searchSymKey");
-          if(symInput){
-            symInput.addEventListener("input", function(){
-              const v = (this.value || "").trim();
-              if(keySymbolColIdx < 0) return;
-
-              // clear all filters then apply only symbol exact
-              api.columns().search("");
-              api.search(""); // clear global
-              if(v === ""){
-                api.draw();
-              }else{
-                api.column(keySymbolColIdx).search(exactRegexFromInput(v), true, false).draw();
-              }
-            });
-          }
-
-          // Global Search box -> exact match on Symbol column too
+          addColumnFilters(api, headersKey, ["symbol"]);
+          wireSearchSym("searchSymKey", api, keySymbolColIdx);
           wireGlobalSearchExactTicker(api, keySymbolColIdx);
-
-          updateRowInfoFromDT(dtKey);
-          adjustDT(dtKey);
+          updateRowInfoFromDT(dtKey); adjustDT(dtKey);
         }
       });
-
-      dtKey.on("draw", function(){ updateRowInfoFromDT(dtKey); });
-      updateRowInfoFromDT(dtKey);
-      adjustDT(dtKey);
+      dtKey.on("draw", () => updateRowInfoFromDT(dtKey));
+      updateRowInfoFromDT(dtKey); adjustDT(dtKey);
     }
 
     function applyRangeAndReverseKey(){
       const sel = document.getElementById("selRangeKey").value;
       let rows = allRowsKey.slice();
-
       if(sel !== "all" && dateColKey){
-        const n = parseInt(sel, 10);
-        const cutoff = monthsAgoDate(n);
-        rows = rows.filter(r => {
-          const d = parseDate(r[dateColKey]);
-          return d && d >= cutoff;
-        });
+        const cutoff = monthsAgoDate(parseInt(sel,10));
+        rows = rows.filter(r => { const d = parseDate(r[dateColKey]); return d && d >= cutoff; });
       }
-
       if(isReversedKey) rows.reverse();
-
       buildDataTableKey(rows);
-
-      const rangeText = (sel === "all") ? "ALL" : `Latest ${sel} month(s)`;
-      const revText = isReversedKey ? "Reversed" : "Normal";
-      const dateText = dateColKey ? `DateCol=${dateColKey}` : "DateCol=NONE";
-      setMeta(`OpFlowKey | ${rangeText} | ${revText} | ${dateText}`);
+      setMeta(`OpFlowKey | ${sel === "all" ? "ALL" : `Latest ${sel} month(s)`} | ${isReversedKey ? "Reversed" : "Normal"} | ${dateColKey ? `DateCol=${dateColKey}` : "DateCol=NONE"}`);
     }
 
     // =========================
-    // OpFlowAgg (LAZY INIT)
+    // OpFlowAgg
     // =========================
     const BASE_CSV_AGG = "latestAgg.csv";
     const DATE_COL_CANDIDATES_AGG = ["CreateDate", "CreatedDate", "As.Date", "As Date", "Date", "Created"];
-
-    let dtAgg = null;
-    let headersAgg = [];
-    let allRowsAgg = [];
-    let isReversedAgg = false;
-    let dateColAgg = null;
-
-    let aggLoaded = false;
-    let aggInitDone = false;
-
-    // for searchSym + global exact search
-    let aggTickerColIdx = -1;
+    let dtAgg = null, headersAgg = [], allRowsAgg = [], isReversedAgg = false, dateColAgg = null;
+    let aggLoaded = false, aggInitDone = false, aggTickerColIdx = -1;
 
     function detectDateColAgg(){
-      for(const c of DATE_COL_CANDIDATES_AGG){
-        if(headersAgg.includes(c)) return c;
-      }
+      for(const c of DATE_COL_CANDIDATES_AGG) if(headersAgg.includes(c)) return c;
       return null;
     }
 
     function buildHeaderAgg(){
       const hdr = document.getElementById("hdrRowAgg");
       hdr.innerHTML = "";
-      headersAgg.forEach(h => {
-        const th = document.createElement("th");
-        th.textContent = h;
-        hdr.appendChild(th);
-      });
+      headersAgg.forEach(h => { const th = document.createElement("th"); th.textContent = h; hdr.appendChild(th); });
       aggTickerColIdx = headersAgg.findIndex(h => String(h).trim().toLowerCase() === "tickers");
     }
 
     function buildDataTableAgg(data){
-      if(dtAgg){
-        dtAgg.destroy();
-        $("#tblAgg tbody").empty();
-      }
-
+      if(dtAgg){ dtAgg.destroy(); $("#tblAgg tbody").empty(); }
       const tbody = document.querySelector("#tblAgg tbody");
       tbody.innerHTML = "";
       data.forEach(row => {
         const tr = document.createElement("tr");
-        headersAgg.forEach(h => {
-          const td = document.createElement("td");
-          td.textContent = row[h] ?? "";
-          tr.appendChild(td);
-        });
+        headersAgg.forEach(h => { const td = document.createElement("td"); td.textContent = row[h] ?? ""; tr.appendChild(td); });
         tbody.appendChild(tr);
       });
 
       dtAgg = $("#tblAgg").DataTable({
         pageLength: -1,
         lengthMenu: [[50,100,200,300,500,-1],[50,100,200,300,500,"All"]],
-        order: [],
-        deferRender: true,
-        autoWidth: false,
-        fixedHeader: true,
-
+        order: [], deferRender: true, autoWidth: false, fixedHeader: true,
         search: { smart: false },
-
         createdRow: function(row, dataArr){
           const tds = row.querySelectorAll("td");
           for(let i=0;i<tds.length;i++){
@@ -658,67 +571,16 @@
             else if(n <= -1000000) tds[i].classList.add("cell-neg");
           }
         },
-
         initComplete: function(){
           const api = this.api();
-
-          // per-column filters (Tickers exact; others contains)
-          api.columns().every(function(){
-            const col = this;
-            const thEl = col.header();
-            const colName = (thEl.textContent || "").trim();
-            const isTickerCol = (colName.toLowerCase() === "tickers");
-
-            const th = $(thEl);
-            th.find("input.col-filter").remove();
-
-            $('<input class="col-filter" type="text" placeholder="filter...">')
-              .appendTo(th)
-              .on("keyup change clear", function(){
-                const v = (this.value || "").trim();
-
-                if(isTickerCol){
-                  if(v === ""){
-                    col.search("", false, true).draw();
-                  }else{
-                    col.search(exactRegexFromInput(v), true, false).draw();
-                  }
-                }else{
-                  if(col.search() !== v){
-                    col.search(v, false, true).draw();
-                  }
-                }
-              });
-          });
-
-          // searchSym exact ticker
-          const symInput = document.getElementById("searchSymAgg");
-          if(symInput){
-            symInput.addEventListener("input", function(){
-              const v = (this.value || "").trim();
-              if(aggTickerColIdx < 0) return;
-
-              api.columns().search("");
-              api.search("");
-              if(v === ""){
-                api.draw();
-              }else{
-                api.column(aggTickerColIdx).search(exactRegexFromInput(v), true, false).draw();
-              }
-            });
-          }
-
-          // Global Search box -> exact match on Tickers column too
+          addColumnFilters(api, headersAgg, ["tickers"]);
+          wireSearchSym("searchSymAgg", api, aggTickerColIdx);
           wireGlobalSearchExactTicker(api, aggTickerColIdx);
-
-          updateRowInfoFromDT(dtAgg);
-          adjustDT(dtAgg);
+          updateRowInfoFromDT(dtAgg); adjustDT(dtAgg);
         }
       });
-
-      dtAgg.on("draw", function(){ updateRowInfoFromDT(dtAgg); });
-      updateRowInfoFromDT(dtAgg);
-      adjustDT(dtAgg);
+      dtAgg.on("draw", () => updateRowInfoFromDT(dtAgg));
+      updateRowInfoFromDT(dtAgg); adjustDT(dtAgg);
     }
 
     function rangeAggToCutoff(sel){
@@ -737,45 +599,100 @@
     function applyRangeAndReverseAgg(){
       const sel = document.getElementById("selRangeAgg").value;
       let rows = allRowsAgg.slice();
-
       const cutoff = rangeAggToCutoff(sel);
-      if(cutoff && dateColAgg){
-        rows = rows.filter(r => {
-          const d = parseDate(r[dateColAgg]);
-          return d && d >= cutoff;
-        });
-      }
-
+      if(cutoff && dateColAgg) rows = rows.filter(r => { const d = parseDate(r[dateColAgg]); return d && d >= cutoff; });
       if(isReversedAgg) rows.reverse();
-
       buildDataTableAgg(rows);
-
-      const rangeText = (sel === "all") ? "ALL" : `Latest ${sel}`;
-      const revText = isReversedAgg ? "Reversed" : "Normal";
-      const dateText = dateColAgg ? `DateCol=${dateColAgg}` : "DateCol=NONE";
-      setMeta(`OpFlowAgg | ${rangeText} | ${revText} | ${dateText}`);
+      setMeta(`OpFlowAgg | ${sel === "all" ? "ALL" : `Latest ${sel}`} | ${isReversedAgg ? "Reversed" : "Normal"} | ${dateColAgg ? `DateCol=${dateColAgg}` : "DateCol=NONE"}`);
     }
 
     function ensureAggInit(){
       if(aggInitDone) return;
-      if(!aggLoaded){
-        setMeta("OpFlowAgg not loaded yet...");
-        return;
-      }
-      buildHeaderAgg();
-      applyRangeAndReverseAgg();
-
+      if(!aggLoaded){ setMeta("OpFlowAgg not loaded yet..."); return; }
+      buildHeaderAgg(); applyRangeAndReverseAgg();
       document.getElementById("selRangeAgg").addEventListener("change", applyRangeAndReverseAgg);
-
-      document.getElementById("btnReverseAgg").addEventListener("click", function(){
-        isReversedAgg = !isReversedAgg;
-        applyRangeAndReverseAgg();
-      });
-
+      document.getElementById("btnReverseAgg").addEventListener("click", function(){ isReversedAgg = !isReversedAgg; applyRangeAndReverseAgg(); });
       document.getElementById("btnResetAgg").addEventListener("click", hardReload);
-
       aggInitDone = true;
       setTimeout(() => adjustDT(dtAgg), 50);
+    }
+
+    // =========================
+    // KeyContractOI
+    // =========================
+    const BASE_CSV_OI = "latestOI.csv";
+    const DATE_COL_CANDIDATES_OI = ["CreateDate", "CreatedDate", "Date"];
+    let dtOI = null, headersOI = [], allRowsOI = [], isReversedOI = false, dateColOI = null;
+    let oiLoaded = false, oiInitDone = false, oiSymbolColIdx = -1;
+
+    function detectDateColOI(){
+      for(const c of DATE_COL_CANDIDATES_OI) if(headersOI.includes(c)) return c;
+      return null;
+    }
+
+    function buildHeaderOI(){
+      const hdr = document.getElementById("hdrRowOI");
+      hdr.innerHTML = "";
+      headersOI.forEach(h => { const th = document.createElement("th"); th.textContent = h; hdr.appendChild(th); });
+      oiSymbolColIdx = headersOI.findIndex(h => String(h).trim().toLowerCase() === "symbol");
+    }
+
+    function buildDataTableOI(data){
+      if(dtOI){ dtOI.destroy(); $("#tblOI tbody").empty(); }
+      const tbody = document.querySelector("#tblOI tbody");
+      tbody.innerHTML = "";
+      data.forEach(row => {
+        const tr = document.createElement("tr");
+        headersOI.forEach(h => { const td = document.createElement("td"); td.textContent = row[h] ?? ""; tr.appendChild(td); });
+        tbody.appendChild(tr);
+      });
+
+      dtOI = $("#tblOI").DataTable({
+        pageLength: -1,
+        lengthMenu: [[25,50,100,250,500,-1],[25,50,100,250,500,"All"]],
+        order: [], deferRender: true, autoWidth: false, fixedHeader: true,
+        search: { smart: false },
+        createdRow: function(row, dataArr){
+          const obj = {}; headersOI.forEach((h,i) => obj[h] = dataArr[i]);
+          const flag = (obj["vecBullBearFlag"] || "").toString().trim().toUpperCase();
+          const prem = parseFloat(String(obj["FinalNetPrem"] || "").replace(/,/g, "").trim());
+          if(!Number.isNaN(prem) && prem <= 0){ row.classList.add("row-grey"); return; }
+          if(flag === "BULL") row.classList.add("row-bull");
+          if(flag === "BEAR") row.classList.add("row-bear");
+        },
+        initComplete: function(){
+          const api = this.api();
+          addColumnFilters(api, headersOI, ["symbol"]);
+          wireSearchSym("searchSymOI", api, oiSymbolColIdx);
+          wireGlobalSearchExactTicker(api, oiSymbolColIdx);
+          updateRowInfoFromDT(dtOI); adjustDT(dtOI);
+        }
+      });
+      dtOI.on("draw", () => updateRowInfoFromDT(dtOI));
+      updateRowInfoFromDT(dtOI); adjustDT(dtOI);
+    }
+
+    function applyRangeAndReverseOI(){
+      const sel = document.getElementById("selRangeOI").value;
+      let rows = allRowsOI.slice();
+      if(sel !== "all" && dateColOI){
+        const cutoff = monthsAgoDate(parseInt(sel,10));
+        rows = rows.filter(r => { const d = parseDate(r[dateColOI]); return d && d >= cutoff; });
+      }
+      if(isReversedOI) rows.reverse();
+      buildDataTableOI(rows);
+      setMeta(`KeyContractOI | ${sel === "all" ? "ALL" : `Latest ${sel} month(s)`} | ${isReversedOI ? "Reversed" : "Normal"} | ${dateColOI ? `DateCol=${dateColOI}` : "DateCol=NONE"}`);
+    }
+
+    function ensureOIInit(){
+      if(oiInitDone) return;
+      if(!oiLoaded){ setMeta("KeyContractOI not loaded yet..."); return; }
+      buildHeaderOI(); applyRangeAndReverseOI();
+      document.getElementById("selRangeOI").addEventListener("change", applyRangeAndReverseOI);
+      document.getElementById("btnReverseOI").addEventListener("click", function(){ isReversedOI = !isReversedOI; applyRangeAndReverseOI(); });
+      document.getElementById("btnResetOI").addEventListener("click", hardReload);
+      oiInitDone = true;
+      setTimeout(() => adjustDT(dtOI), 50);
     }
 
     // =========================
@@ -783,35 +700,22 @@
     // =========================
     function loadCsv(url, onOk, onFail){
       Papa.parse(url, {
-        download: true,
-        header: true,
-        dynamicTyping: false,
-        skipEmptyLines: true,
-        complete: function(results){ onOk(results); },
-        error: function(err){ onFail(err); }
+        download: true, header: true, dynamicTyping: false, skipEmptyLines: true,
+        complete: results => onOk(results),
+        error: err => onFail(err)
       });
     }
 
-    // Load Key (init immediately, visible)
-    const csvUrlKey = `${BASE_CSV_KEY}?v=${Date.now()}`;
-    loadCsv(csvUrlKey,
+    // Key: visible, initialise immediately
+    loadCsv(`${BASE_CSV_KEY}?v=${Date.now()}`,
       function(results){
         allRowsKey = results.data || [];
         headersKey = results.meta.fields || [];
         dateColKey = detectDateColKey();
-
-        buildHeaderKey();
-        applyRangeAndReverseKey();
-
+        buildHeaderKey(); applyRangeAndReverseKey();
         document.getElementById("selRangeKey").addEventListener("change", applyRangeAndReverseKey);
-
-        document.getElementById("btnReverseKey").addEventListener("click", function(){
-          isReversedKey = !isReversedKey;
-          applyRangeAndReverseKey();
-        });
-
+        document.getElementById("btnReverseKey").addEventListener("click", function(){ isReversedKey = !isReversedKey; applyRangeAndReverseKey(); });
         document.getElementById("btnResetKey").addEventListener("click", hardReload);
-
         activateTab("KEY");
       },
       function(err){
@@ -821,20 +725,26 @@
       }
     );
 
-    // Load Agg (ONLY load data; init later when tab shown)
-    const csvUrlAgg = `${BASE_CSV_AGG}?v=${Date.now()}`;
-    loadCsv(csvUrlAgg,
+    // Agg: load only, lazy initialise when tab is opened
+    loadCsv(`${BASE_CSV_AGG}?v=${Date.now()}`,
       function(results){
         allRowsAgg = results.data || [];
         headersAgg = results.meta.fields || [];
         dateColAgg = detectDateColAgg();
         aggLoaded = true;
       },
-      function(err){
-        console.error(err);
-        aggLoaded = false;
-        setMeta("OpFlowAgg load failed (latestAgg.csv missing?)");
-      }
+      function(err){ console.error(err); aggLoaded = false; }
+    );
+
+    // OI: load only, lazy initialise when tab is opened
+    loadCsv(`${BASE_CSV_OI}?v=${Date.now()}`,
+      function(results){
+        allRowsOI = results.data || [];
+        headersOI = results.meta.fields || [];
+        dateColOI = detectDateColOI();
+        oiLoaded = true;
+      },
+      function(err){ console.error(err); oiLoaded = false; }
     );
   </script>
 </body>
